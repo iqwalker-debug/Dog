@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fund Dog Management</title>
+  <link rel="stylesheet" href="src/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="topbar-logo">
+        <span>🐾</span> WalkerWanderWoofs
+      </div>
+      <div class="topbar-title">Fund Dog Management</div>
+    </header>
+
+    <!-- Main layout -->
+    <div class="main">
+
+      <!-- Sidebar: dog list -->
+      <nav class="sidebar" aria-label="Dogs">
+        <div class="sidebar-header">Dogs</div>
+        <div id="dog-list"></div>
+      </nav>
+
+      <!-- Detail pane -->
+      <main class="detail-pane" id="detail-pane"></main>
+
+    </div>
+  </div>
+
+  <!-- Add transaction modal -->
+  <div class="modal-backdrop hidden" id="tx-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal">
+      <h2 id="modal-title">Add Transaction</h2>
+
+      <input type="hidden" id="tx-type" />
+
+      <div class="form-group">
+        <label for="tx-date">Date</label>
+        <input type="date" id="tx-date" />
+      </div>
+
+      <div class="form-group">
+        <label for="tx-amount">Amount (GBP)</label>
+        <input type="number" id="tx-amount" min="0.01" step="0.01" placeholder="0.00" />
+      </div>
+
+      <div class="form-group">
+        <label for="tx-note">Note</label>
+        <input type="text" id="tx-note" placeholder="e.g. Monthly grooming" maxlength="120" />
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary"   onclick="submitTransaction()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="src/dogs.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>
