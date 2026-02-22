@@ -1,178 +1,183 @@
-/* ── State ────────────────────────────────────────────────── */
-let activeDogId = null;
+/* ── Navigation ───────────────────────────────────────────── */
+function goTo(screen) {
+  document.querySelectorAll(".screen").forEach((s) => s.classList.add("hidden"));
+  document.getElementById("screen-" + screen).classList.remove("hidden");
 
-/* ── Helpers ──────────────────────────────────────────────── */
-function fmt(amount, currency = "GBP") {
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-  }).format(amount);
-}
-
-function fmtDate(iso) {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
+  document.querySelectorAll(".nav-item").forEach((b) => {
+    b.classList.toggle("active", b.dataset.screen === screen);
   });
+
+  if (screen === "book") prefillBookingService();
 }
 
-function computeBalance(dog) {
-  return dog.fund.transactions.reduce((acc, tx) => {
-    return tx.type === "deposit" ? acc + tx.amount : acc - tx.amount;
-  }, 0);
+/* ── Toast ────────────────────────────────────────────────── */
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2800);
 }
 
-/* ── Sidebar ──────────────────────────────────────────────── */
-function renderSidebar() {
-  const list = document.getElementById("dog-list");
-  list.innerHTML = DOGS.map((dog) => `
-    <div class="dog-card ${dog.id === activeDogId ? "active" : ""}"
-         data-id="${dog.id}"
-         role="button"
-         tabindex="0"
-         aria-label="${dog.name}">
-      <img class="dog-avatar"
-           src="${dog.photo}"
-           alt="${dog.name}"
-           onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23e8e2d9%22/><text x=%2250%22 y=%2260%22 font-size=%2240%22 text-anchor=%22middle%22>🐾</text></svg>'">
-      <div class="dog-card-info">
-        <div class="dog-card-name">${dog.name}</div>
-        <div class="dog-card-breed">${dog.breed}</div>
+/* ── Copy promo code ──────────────────────────────────────── */
+function copyPromo(code) {
+  navigator.clipboard.writeText(code).catch(() => {});
+  showToast("Code " + code + " copied to clipboard!");
+}
+
+/* ── Render home service scroll ───────────────────────────── */
+function renderHomeServices() {
+  document.getElementById("home-services-scroll").innerHTML = SERVICES.map((s) => `
+    <div class="service-card-mini" onclick="goTo('book');setBookingService('${s.id}')">
+      <div class="svc-icon">${s.icon}</div>
+      <div class="svc-name">${s.name}</div>
+      <div class="svc-price">$${s.price} <span style="font-weight:400;color:#b08060;font-size:.7rem">${s.unit}</span></div>
+    </div>
+  `).join("");
+}
+
+/* ── Render home gallery preview (first 6) ────────────────── */
+function renderHomeGallery() {
+  document.getElementById("home-gallery-preview").innerHTML =
+    GALLERY.slice(0, 6).map(galleryThumb).join("");
+}
+
+function galleryThumb(item) {
+  return `
+    <div class="gallery-thumb">
+      <img src="${item.src}" alt="${item.alt}"
+           onerror="this.parentElement.innerHTML='<div class=gallery-thumb-placeholder>🐾</div>'">
+    </div>`;
+}
+
+/* ── Render services screen ───────────────────────────────── */
+function renderServices() {
+  document.getElementById("services-list").innerHTML = SERVICES.map((s) => `
+    <div class="service-card">
+      <div class="svc-icon-lg">${s.icon}</div>
+      <div class="svc-body">
+        <h3>${s.name}</h3>
+        <p>${s.description}</p>
+      </div>
+      <div class="svc-right">
+        <div class="svc-price-lg">$${s.price}</div>
+        <div class="svc-unit">${s.unit}</div>
+        <button class="btn-book-svc" onclick="goTo('book');setBookingService('${s.id}')">Book</button>
       </div>
     </div>
   `).join("");
+}
 
-  list.querySelectorAll(".dog-card").forEach((card) => {
-    const select = () => selectDog(Number(card.dataset.id));
-    card.addEventListener("click", select);
-    card.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") select(); });
+/* ── Render gallery screen ────────────────────────────────── */
+function renderGallery() {
+  document.getElementById("gallery-grid").innerHTML =
+    GALLERY.map(galleryThumb).join("");
+}
+
+/* ── Render rewards screen ────────────────────────────────── */
+function renderRewards() {
+  document.getElementById("promo-cards").innerHTML = PROMOS.map((p) => `
+    <div class="promo-card">
+      <div class="promo-label">${p.label}</div>
+      <div class="promo-row">
+        <span class="code">${p.code}</span>
+        <button class="btn-copy" id="copy-${p.code}" onclick="handleCopy('${p.code}')">Copy</button>
+      </div>
+      <div class="promo-desc">${p.description}</div>
+    </div>
+  `).join("");
+}
+
+function handleCopy(code) {
+  navigator.clipboard.writeText(code).catch(() => {});
+  const btn = document.getElementById("copy-" + code);
+  btn.textContent = "Copied!";
+  btn.classList.add("copied");
+  setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("copied"); }, 2000);
+  showToast("Code " + code + " copied!");
+}
+
+/* ── Render booking service select ───────────────────────── */
+function renderBookingSelect() {
+  document.getElementById("b-service").innerHTML =
+    SERVICES.map((s) => `<option value="${s.id}">${s.icon} ${s.name} — $${s.price} ${s.unit}</option>`).join("");
+}
+
+function setBookingService(id) {
+  const sel = document.getElementById("b-service");
+  if (sel) sel.value = id;
+}
+
+function prefillBookingService() {
+  const today = new Date().toISOString().slice(0, 10);
+  const dateInput = document.getElementById("b-date");
+  if (dateInput && !dateInput.value) dateInput.value = today;
+}
+
+/* ── Promo validation (booking screen) ────────────────────── */
+let appliedPromo = null;
+
+function applyPromo() {
+  const raw  = document.getElementById("b-promo").value.trim().toUpperCase();
+  const fb   = document.getElementById("promo-feedback");
+  const match = PROMOS.find((p) => p.code === raw);
+
+  if (!raw) { fb.textContent = ""; appliedPromo = null; return; }
+
+  if (match) {
+    appliedPromo = match;
+    const saving = match.type === "percent" ? match.discount + "% off" : "$" + match.discount + " off";
+    fb.textContent = "✓ Code applied — " + saving + "!";
+    fb.className = "promo-feedback ok";
+    showToast("Promo applied: " + saving);
+  } else {
+    appliedPromo = null;
+    fb.textContent = "✗ Code not recognised. Try FIRSTDOG or AUSTIN10.";
+    fb.className = "promo-feedback err";
+  }
+}
+
+/* ── Submit booking ───────────────────────────────────────── */
+function submitBooking() {
+  const name  = document.getElementById("b-name").value.trim();
+  const email = document.getElementById("b-email").value.trim();
+  const dog   = document.getElementById("b-dog").value.trim();
+  const date  = document.getElementById("b-date").value;
+
+  if (!name || !email || !dog || !date) {
+    showToast("Please fill in your name, email, dog's name, and date.");
+    return;
+  }
+
+  const svcId = document.getElementById("b-service").value;
+  const svc   = SERVICES.find((s) => s.id === svcId);
+  let total   = svc.price;
+
+  if (appliedPromo) {
+    if (appliedPromo.type === "percent") {
+      total = total * (1 - appliedPromo.discount / 100);
+    } else {
+      total = Math.max(0, total - appliedPromo.discount);
+    }
+  }
+
+  showToast("🐾 Booking request sent! We'll confirm via email.");
+
+  // Reset form
+  ["b-name","b-email","b-phone","b-dog","b-breed","b-notes","b-promo"].forEach((id) => {
+    document.getElementById(id).value = "";
   });
+  document.getElementById("promo-feedback").textContent = "";
+  appliedPromo = null;
+
+  setTimeout(() => goTo("home"), 1800);
 }
-
-/* ── Detail pane ──────────────────────────────────────────── */
-function renderDetail() {
-  const pane = document.getElementById("detail-pane");
-
-  if (!activeDogId) {
-    pane.innerHTML = `
-      <div class="empty-state">
-        <div class="paw">🐾</div>
-        <p>Select a dog to view their fund details.</p>
-      </div>`;
-    return;
-  }
-
-  const dog = DOGS.find((d) => d.id === activeDogId);
-  const balance = computeBalance(dog);
-  const sorted = [...dog.fund.transactions].sort((a, b) => b.date.localeCompare(a.date));
-
-  pane.innerHTML = `
-    <div class="detail-header">
-      <img class="detail-photo"
-           src="${dog.photo}"
-           alt="${dog.name}"
-           onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23e8e2d9%22/><text x=%2250%22 y=%2260%22 font-size=%2240%22 text-anchor=%22middle%22>🐾</text></svg>'">
-      <div class="detail-meta">
-        <h1>${dog.name}</h1>
-        <div class="breed-age">${dog.breed} &middot; ${dog.age} year${dog.age !== 1 ? "s" : ""} old</div>
-        <div class="owner-label">Managed for <span class="owner-name">${dog.owner}</span></div>
-      </div>
-    </div>
-
-    <p class="description">${dog.description}</p>
-
-    <div class="fund-summary">
-      <div class="fund-balance-block">
-        <div class="fund-balance-label">Fund Balance</div>
-        <div class="fund-balance-value">${fmt(balance, dog.fund.currency)}</div>
-      </div>
-      <div class="fund-actions">
-        <button class="btn btn-secondary" onclick="openModal('withdrawal')">Withdraw</button>
-        <button class="btn btn-primary"   onclick="openModal('deposit')">+ Deposit</button>
-      </div>
-    </div>
-
-    <div class="section-title">Transaction History</div>
-    <table class="tx-table">
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Type</th>
-          <th>Note</th>
-          <th style="text-align:right">Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${sorted.map((tx) => `
-          <tr>
-            <td>${fmtDate(tx.date)}</td>
-            <td><span class="badge badge-${tx.type}">${tx.type}</span></td>
-            <td>${tx.note}</td>
-            <td class="tx-amount ${tx.type}" style="text-align:right">
-              ${tx.type === "deposit" ? "+" : "−"}${fmt(tx.amount, dog.fund.currency)}
-            </td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
-  `;
-}
-
-/* ── Select dog ───────────────────────────────────────────── */
-function selectDog(id) {
-  activeDogId = id;
-  renderSidebar();
-  renderDetail();
-}
-
-/* ── Modal ────────────────────────────────────────────────── */
-function openModal(type) {
-  const modal = document.getElementById("tx-modal");
-  document.getElementById("modal-title").textContent =
-    type === "deposit" ? "Add Deposit" : "Record Withdrawal";
-  document.getElementById("tx-type").value = type;
-  document.getElementById("tx-date").value = new Date().toISOString().slice(0, 10);
-  document.getElementById("tx-amount").value = "";
-  document.getElementById("tx-note").value = "";
-  modal.classList.remove("hidden");
-  document.getElementById("tx-amount").focus();
-}
-
-function closeModal() {
-  document.getElementById("tx-modal").classList.add("hidden");
-}
-
-function submitTransaction() {
-  const dog = DOGS.find((d) => d.id === activeDogId);
-  const type   = document.getElementById("tx-type").value;
-  const date   = document.getElementById("tx-date").value;
-  const amount = parseFloat(document.getElementById("tx-amount").value);
-  const note   = document.getElementById("tx-note").value.trim();
-
-  if (!date || isNaN(amount) || amount <= 0) {
-    alert("Please enter a valid date and a positive amount.");
-    return;
-  }
-
-  if (type === "withdrawal" && amount > computeBalance(dog)) {
-    alert("Insufficient funds for this withdrawal.");
-    return;
-  }
-
-  const newId = Math.max(0, ...dog.fund.transactions.map((t) => t.id)) + 1;
-  dog.fund.transactions.push({ id: newId, date, type, amount, note: note || type });
-
-  closeModal();
-  renderDetail();
-}
-
-/* ── Keyboard: close modal on Escape ──────────────────────── */
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeModal();
-});
 
 /* ── Init ─────────────────────────────────────────────────── */
-renderSidebar();
-renderDetail();
+renderHomeServices();
+renderHomeGallery();
+renderServices();
+renderGallery();
+renderRewards();
+renderBookingSelect();
