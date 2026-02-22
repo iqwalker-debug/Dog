@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Walker WanderWoofs</title>
+  <link rel="stylesheet" href="src/style.css" />
+</head>
+<body>
+<div class="app">
+
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="topbar-logo">Walker <span>Wander</span>Woofs</div>
+    <div class="topbar-icons">
+      <button class="icon-btn" aria-label="Notifications">🔔</button>
+      <button class="icon-btn" aria-label="Profile">🐾</button>
+    </div>
+  </header>
+
+  <!-- ── HOME ─────────────────────────────────────────────── -->
+  <section class="screen" id="screen-home">
+
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero-badge">📍 Proudly serving Austin, TX</div>
+      <h1>Professional care for your dog</h1>
+      <p>Every walk, every adventure, every day — trusted by Austin families.</p>
+      <button class="btn-hero" onclick="goTo('book')">🐶 Book Here!</button>
+    </div>
+
+    <!-- Promo chip -->
+    <div class="promo-chip" onclick="copyPromo('FIRSTDOG')">
+      <span class="pc-icon">🎁</span>
+      <div class="pc-text">
+        <div class="pc-label">First visit? Use code</div>
+        <div class="pc-code">FIRSTDOG</div>
+      </div>
+      <span class="pc-copy">Tap to copy</span>
+    </div>
+
+    <!-- Services preview -->
+    <div class="section-head">
+      <h2>Our Services</h2>
+      <button class="see-all" onclick="goTo('services')">See all →</button>
+    </div>
+    <div class="service-scroll" id="home-services-scroll"></div>
+
+    <!-- Trust strip -->
+    <div class="trust-strip">
+      <div class="trust-item">
+        <div class="ti-icon">✅</div>
+        <div class="ti-label">Fully Insured</div>
+      </div>
+      <div class="trust-item">
+        <div class="ti-icon">📍</div>
+        <div class="ti-label">GPS Tracked Walks</div>
+      </div>
+      <div class="trust-item">
+        <div class="ti-icon">📸</div>
+        <div class="ti-label">Photo Updates</div>
+      </div>
+    </div>
+
+    <!-- Gallery preview -->
+    <div class="section-head">
+      <h2>Happy Pups</h2>
+      <button class="see-all" onclick="goTo('gallery')">See all →</button>
+    </div>
+    <div class="gallery-grid" id="home-gallery-preview"></div>
+
+  </section>
+
+  <!-- ── SERVICES ──────────────────────────────────────────── -->
+  <section class="screen hidden" id="screen-services">
+    <div class="screen-title">Services</div>
+    <div class="service-list" id="services-list"></div>
+  </section>
+
+  <!-- ── GALLERY ───────────────────────────────────────────── -->
+  <section class="screen hidden" id="screen-gallery">
+    <div class="screen-title">Gallery</div>
+    <div class="gallery-grid" id="gallery-grid"></div>
+  </section>
+
+  <!-- ── REWARDS ───────────────────────────────────────────── -->
+  <section class="screen hidden" id="screen-rewards">
+    <div class="rewards-hero">
+      <div class="rh-icon">🏆</div>
+      <h2>WanderWoofs Rewards</h2>
+      <p>Exclusive codes and perks for our loyal pack.</p>
+    </div>
+    <div id="promo-cards"></div>
+  </section>
+
+  <!-- ── BOOK ─────────────────────────────────────────────── -->
+  <section class="screen hidden" id="screen-book">
+    <div class="screen-title">Book a Service</div>
+
+    <div class="book-card">
+      <h3>Your details</h3>
+      <div class="form-row">
+        <label for="b-name">Your name</label>
+        <input type="text" id="b-name" placeholder="Jane Smith" />
+      </div>
+      <div class="form-row">
+        <label for="b-email">Email</label>
+        <input type="email" id="b-email" placeholder="jane@example.com" />
+      </div>
+      <div class="form-row">
+        <label for="b-phone">Phone</label>
+        <input type="tel" id="b-phone" placeholder="(512) 000-0000" />
+      </div>
+    </div>
+
+    <div class="book-card">
+      <h3>Your dog</h3>
+      <div class="form-row">
+        <label for="b-dog">Dog's name</label>
+        <input type="text" id="b-dog" placeholder="Biscuit" />
+      </div>
+      <div class="form-row">
+        <label for="b-breed">Breed</label>
+        <input type="text" id="b-breed" placeholder="Golden Retriever" />
+      </div>
+    </div>
+
+    <div class="book-card">
+      <h3>Booking</h3>
+      <div class="form-row">
+        <label for="b-service">Service</label>
+        <select id="b-service"></select>
+      </div>
+      <div class="form-row">
+        <label for="b-date">Preferred date</label>
+        <input type="date" id="b-date" />
+      </div>
+      <div class="form-row">
+        <label for="b-notes">Any notes</label>
+        <textarea id="b-notes" rows="3" placeholder="e.g. Luna is shy with big dogs…"></textarea>
+      </div>
+      <div class="form-row">
+        <label for="b-promo">Promo code</label>
+        <div class="promo-input-row">
+          <input type="text" id="b-promo" placeholder="e.g. FIRSTDOG" style="text-transform:uppercase" />
+          <button class="btn-apply" onclick="applyPromo()">Apply</button>
+        </div>
+        <div class="promo-feedback" id="promo-feedback"></div>
+      </div>
+      <button class="btn-submit" onclick="submitBooking()">🐾 Request Booking</button>
+    </div>
+  </section>
+
+  <!-- Bottom nav -->
+  <nav class="bottom-nav" aria-label="Main navigation">
+    <button class="nav-item active" data-screen="home"     onclick="goTo('home')">
+      <span class="nav-icon">🏠</span> Home
+    </button>
+    <button class="nav-item"        data-screen="services" onclick="goTo('services')">
+      <span class="nav-icon">🦮</span> Services
+    </button>
+    <button class="nav-item"        data-screen="gallery"  onclick="goTo('gallery')">
+      <span class="nav-icon">📸</span> Gallery
+    </button>
+    <button class="nav-item"        data-screen="rewards"  onclick="goTo('rewards')">
+      <span class="nav-icon">🏆</span> Rewards
+    </button>
+    <button class="nav-item"        data-screen="book"     onclick="goTo('book')">
+      <span class="nav-icon">📅</span> Book
+    </button>
+  </nav>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="src/data.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>
