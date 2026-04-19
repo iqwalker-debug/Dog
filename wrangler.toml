@@ -1,0 +1,32 @@
+name = "refuge-pwa"
+main = "src/worker/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Static SPA assets served by the Worker. SPA fallback routes unknown paths
+# to index.html so Wouter can handle client-side routing.
+[assets]
+directory = "./dist/client"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# D1 — run `wrangler d1 create refuge-pwa-db` then paste the id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "refuge-pwa-db"
+database_id = "REPLACE_WITH_D1_ID"
+migrations_dir = "src/db/migrations"
+
+# R2 — run `wrangler r2 bucket create refuge-pwa-media`
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "refuge-pwa-media"
+
+# Non-secret vars. Secrets (Stripe, Clerk, VAPID) go via `wrangler secret put`.
+[vars]
+APP_ENV = "development"
+
+# Dev overrides
+[env.dev]
+[env.dev.vars]
+APP_ENV = "development"
