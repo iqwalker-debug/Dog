@@ -1,0 +1,38 @@
+# Node
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+npm-debug.log*
+
+# Turborepo
+.turbo/
+
+# Build output
+dist/
+.output/
+.vite/
+build/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
