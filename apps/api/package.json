@@ -1,0 +1,12 @@
+{
+  "name": "api",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "uv run uvicorn kennel_api.main:app --reload --port 8000",
+    "build": "uv sync --frozen",
+    "test": "uv run pytest -q",
+    "lint": "uv run ruff check .",
+    "migrate": "uv run alembic upgrade head"
+  }
+}
