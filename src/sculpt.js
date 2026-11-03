@@ -38,6 +38,16 @@ export function smoothUnion(shapes, k = 0.08) {
   };
 }
 
+// carve shape b out of a (eye sockets, mouth line)
+export function smoothSubtract(a, b, k = 0.02) {
+  // smooth max(a, -b)
+  return (p) => {
+    const da = a(p), db = b(p);
+    const h = THREE.MathUtils.clamp(0.5 + (0.5 * (da + db)) / k, 0, 1);
+    return -db + (da + db) * h + k * h * (1 - h);
+  };
+}
+
 /**
  * Polygonize `dist` inside a cube (center, half-size) at `res`^3.
  * colorFn(p) -> THREE.Color adds per-vertex colors (for coat markings).

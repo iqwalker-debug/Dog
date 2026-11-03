@@ -2,7 +2,7 @@
 // two-segment legs, breed ears/tails, collar or harness. Gaits: swim, walk/trot/run, shake.
 import * as THREE from 'three';
 import { makeFur } from './fur.js';
-import { sculpt, sdf, smoothUnion } from './sculpt.js';
+import { sculpt, sdf, smoothUnion, smoothSubtract } from './sculpt.js';
 import { BREEDS } from './breeds.js';
 
 const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -27,7 +27,7 @@ export function createDog(opts = {}) {
   const skinMat = new THREE.MeshStandardMaterial({ color: '#b8b8b8', vertexColors: true, roughness: 0.9 });
   const dark = new THREE.MeshStandardMaterial({ color: '#1a1412', roughness: 0.3 });
   const eyeMat = new THREE.MeshStandardMaterial({ color: '#3b2210', roughness: 0.05 });
-  const tongueMat = new THREE.MeshStandardMaterial({ color: '#e5747f', roughness: 0.35 });
+  const tongueMat = new THREE.MeshStandardMaterial({ color: '#e46f7c', roughness: 0.3 });
   const fl = B.furLen;
 
   function furred(geo, parent, furScale = 1, extra = {}) {
@@ -52,29 +52,80 @@ export function createDog(opts = {}) {
   ], 0.1);
   furred(sculpt(body, v3(0, 0.08, 0.05), 0.85, 44, (p) => tint('body', p)), rig);
 
-  // ---- head ----
+  // ---- head: skull + upper muzzle + brows + cheeks + lips, eye sockets carved; separate opening jaw ----
   const neck = new THREE.Group(); neck.position.set(0, 0.4, 0.64); rig.add(neck);
   const head = new THREE.Group(); neck.add(head);
   const sn = B.snout, frenchie = key === 'frenchie';
-  const skullR = frenchie ? v3(0.17, 0.15, 0.15) : v3(0.135 * W, 0.135, 0.15);
-  const muzzleR = frenchie ? 0.1 : 0.08;
-  const headSdf = smoothUnion([
+  const skullR = frenchie ? v3(0.165, 0.15, 0.145) : v3(0.13 * W, 0.13, 0.15);
+  const muzzleR = frenchie ? 0.095 : 0.072;
+  const muzzleEnd = 0.06 + sn;
+  const eyeX = (frenchie ? 0.085 : 0.065) * W, eyeY = frenchie ? 0.035 : 0.05, eyeZ = frenchie ? 0.115 : 0.105;
+  const parts = [
     sdf.ellipsoid(v3(0, 0.04, -0.02), skullR),
-    sdf.capsule(v3(0, -0.025, 0.06), v3(0, -0.04, 0.06 + sn), muzzleR, muzzleR * 0.85),
-    sdf.capsule(v3(0, -0.075, 0.04), v3(0, -0.08, 0.03 + sn * 0.85), 0.05, 0.045),
-    sdf.ellipsoid(v3(0.075 * W, -0.02, 0.04), v3(0.06, 0.06, 0.07)),
-    sdf.ellipsoid(v3(-0.075 * W, -0.02, 0.04), v3(0.06, 0.06, 0.07)),
-  ], 0.05);
-  const headFur = 0.45;
-  furred(sculpt(headSdf, v3(0, 0, 0.08), 0.34, 34, (p) => tint('head', p)), head, headFur);
-  const tipZ = 0.06 + sn + muzzleR * 0.85 + fl * headFur * 0.6;
-  plain(new THREE.SphereGeometry(frenchie ? 0.045 : 0.036, 14, 10), dark, v3(0, -0.03, tipZ - 0.01), head).scale.set(1.2, 0.85, 0.9);
-  for (const s of [-1, 1]) {
-    const eye = plain(new THREE.SphereGeometry(0.024, 14, 10), eyeMat, v3(s * 0.068 * W, 0.045, 0.1 + fl * headFur * 0.7), head);
-    if (frenchie) eye.scale.setScalar(1.3);
+    sdf.capsule(v3(0, -0.02, 0.05), v3(0, -0.035, muzzleEnd), muzzleR, muzzleR * 0.82),         // upper muzzle
+    sdf.ellipsoid(v3(eyeX, eyeY + 0.03, eyeZ - 0.02), v3(0.035, 0.018, 0.03)),                // brows
+    sdf.ellipsoid(v3(-eyeX, eyeY + 0.03, eyeZ - 0.02), v3(0.035, 0.018, 0.03)),
+    sdf.ellipsoid(v3(0.075 * W, -0.03, 0.03), v3(0.065, 0.065, 0.075)),                         // cheeks
+    sdf.ellipsoid(v3(-0.075 * W, -0.03, 0.03), v3(0.065, 0.065, 0.075)),
+    sdf.ellipsoid(v3(0.045, -0.07, 0.04 + sn * 0.6), v3(0.03, 0.035, Math.max(0.05, sn * 0.5))),  // lips / flews
+    sdf.ellipsoid(v3(-0.045, -0.07, 0.04 + sn * 0.6), v3(0.03, 0.035, Math.max(0.05, sn * 0.5))),
+  ];
+  if (frenchie) { // nose-roll and forehead wrinkles
+    parts.push(sdf.capsule(v3(-0.06, 0.005, 0.15), v3(0.06, 0.005, 0.15), 0.022));
+    parts.push(sdf.capsule(v3(-0.05, 0.11, 0.11), v3(0.05, 0.11, 0.11), 0.014));
+    parts.push(sdf.capsule(v3(-0.04, 0.14, 0.09), v3(0.04, 0.14, 0.09), 0.012));
   }
-  const tongue = plain(new THREE.CapsuleGeometry(0.035, 0.09, 4, 8), tongueMat, v3(0, -0.11, 0.06 + sn * 0.8), head);
-  tongue.rotation.x = 1.1; tongue.scale.set(1.4, 1, 0.5);
+  let headSdf = smoothUnion(parts, 0.04);
+  headSdf = smoothSubtract(headSdf, sdf.sphere(v3(eyeX, eyeY, eyeZ + 0.015), 0.03), 0.02);
+  headSdf = smoothSubtract(headSdf, sdf.sphere(v3(-eyeX, eyeY, eyeZ + 0.015), 0.03), 0.02);
+
+  // fur is short on the muzzle and around the eyes, longer on skull and cheeks
+  const faceLen = (p) => {
+    const muzzle = THREE.MathUtils.smoothstep(p.z, 0.04, 0.1);
+    const nearEye = Math.min(Math.hypot(Math.abs(p.x) - eyeX, p.y - eyeY, p.z - eyeZ), 0.1) / 0.1;
+    return Math.max(0.15, (1 - 0.8 * muzzle) * (0.3 + 0.7 * nearEye));
+  };
+  const withLen = (geo, fn) => {
+    const P = geo.attributes.position, a = new Float32Array(P.count), v = new THREE.Vector3();
+    for (let i = 0; i < P.count; i++) a[i] = fn(v.fromBufferAttribute(P, i));
+    geo.setAttribute('aLen', new THREE.BufferAttribute(a, 1)); return geo;
+  };
+  const headFur = 0.75;
+  furred(withLen(sculpt(headSdf, v3(0, 0, 0.08), 0.34, 40, (p) => tint('head', p)), faceLen), head, headFur);
+
+  // nose: wide leather pad with nostrils
+  const noseZ = muzzleEnd + muzzleR * 0.82 - 0.012;
+  const nose = new THREE.Group(); nose.position.set(0, -0.02, noseZ); head.add(nose);
+  const noseW = frenchie ? 0.05 : 0.034;
+  plain(new THREE.SphereGeometry(1, 18, 12), dark, v3(0, 0, 0), nose).scale.set(noseW, noseW * 0.72, noseW * 0.7);
+  const nostril = new THREE.MeshBasicMaterial({ color: '#050404' });
+  for (const s of [-1, 1]) plain(new THREE.SphereGeometry(noseW * 0.28, 8, 6), nostril, v3(s * noseW * 0.42, -noseW * 0.2, noseW * 0.52), nose);
+
+  // eyes: brown iris, pupil, catch-light; lids = vertical squash
+  const eyes = [-1, 1].map((s) => {
+    const g = new THREE.Group(); g.position.set(s * eyeX, eyeY, eyeZ + 0.004); head.add(g);
+    const r = frenchie ? 0.03 : 0.022;
+    plain(new THREE.SphereGeometry(r, 16, 12), eyeMat, v3(0, 0, 0), g);
+    plain(new THREE.SphereGeometry(r * 0.55, 12, 8), new THREE.MeshStandardMaterial({ color: '#050403', roughness: 0.05 }), v3(0, 0, r * 0.62), g);
+    plain(new THREE.SphereGeometry(r * 0.18, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffffff' }), v3(-s * r * 0.3, r * 0.35, r * 0.9), g);
+    const lid = plain(new THREE.SphereGeometry(r * 1.12, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.6), skinMat, v3(0, 0, 0), g);
+    lid.material = new THREE.MeshStandardMaterial({ color: tint('head', v3(s * eyeX, eyeY + 0.03, eyeZ)).multiplyScalar(0.8), roughness: 0.9 });
+    return { g, lid };
+  });
+
+  // jaw hinges open for panting; mouth interior + tongue ride on it
+  const jaw = new THREE.Group(); jaw.position.set(0, -0.065, 0.02); head.add(jaw);
+  const jawSdf = smoothUnion([
+    sdf.capsule(v3(0, -0.01, 0.0), v3(0, -0.012, sn * 0.85 + 0.03), frenchie ? 0.06 : 0.045, frenchie ? 0.055 : 0.04),
+    sdf.ellipsoid(v3(0, -0.03, 0.0), v3(0.06, 0.04, 0.06)),
+  ], 0.04);
+  furred(withLen(sculpt(jawSdf, v3(0, -0.02, 0.07), 0.2, 28, (p) => tint('head', v3(p.x, p.y - 0.065, p.z + 0.04))), () => 0.35), jaw, headFur);
+  const mouthMat = new THREE.MeshStandardMaterial({ color: '#5b2329', roughness: 0.5 });
+  const mouth = plain(new THREE.SphereGeometry(1, 14, 10), mouthMat, v3(0, 0.02, sn * 0.45 + 0.02), jaw);
+  mouth.scale.set(0.05, 0.022, Math.max(0.06, sn * 0.5));
+  const tongue = new THREE.Group(); tongue.position.set(0, 0.012, sn * 0.5); jaw.add(tongue);
+  const tg = new THREE.CapsuleGeometry(0.03, 0.11, 6, 10).rotateX(Math.PI / 2).translate(0, 0, 0.07);
+  plain(tg, tongueMat, v3(0, 0, 0), tongue).scale.set(frenchie ? 1.7 : 1.4, 0.35, 1);
 
   // ---- ears ----
   const ears = [-1, 1].map((s) => {
@@ -139,13 +190,13 @@ export function createDog(opts = {}) {
     collar.scale.set(0.15 * W + off, 0.15 + off, 0.15);
     collar.position.set(0, 0.3, 0.53); collar.rotation.x = -0.75; rig.add(collar);
     if (B.gear.type === 'harness') {
-      for (const [z, r] of [[0.38, 0.27], [0.08, 0.255]]) {
+      for (const [z, r] of [[0.38, 0.24], [0.08, 0.22]]) {
         const band = new THREE.Mesh(new THREE.TorusGeometry(1, 0.035, 6, 32), gm);
-        band.scale.set(r * W + off * 0.6, 0.29 + off * 0.6, 1); band.position.set(0, 0.03, z); band.rotation.x = z > 0.2 ? -0.35 : 0;
+        band.scale.set(r * W * (0.6 + 0.4 * D) + off * 0.6, 0.29 * D + off * 0.6, 1); band.position.set(0, 0.03, z); band.rotation.x = z > 0.2 ? -0.35 : 0;
         rig.add(band);
       }
       const plate = new THREE.Mesh(new THREE.BoxGeometry(0.2 * W, 0.04, 0.34), gm);
-      plate.position.set(0, 0.31 + off * 0.6, 0.22); rig.add(plate);
+      plate.position.set(0, 0.29 * D + 0.03 + off * 0.6, 0.22); rig.add(plate);
     }
   }
 
@@ -168,7 +219,7 @@ export function createDog(opts = {}) {
   }
 
   let t = Math.random() * 10, gait = 0, splashT = 0, shakeT = 0, wet = 0, landTime = 0;
-  let prevY = 0, prevVy = 0, mode = 'swim';
+  let prevY = 0, prevVy = 0, mode = 'swim', mouthOpen = 0, idle = 0, blinkT = 2;
   const wagBase = tailRoot.rotation.x;
 
   const api = {
@@ -201,7 +252,7 @@ export function createDog(opts = {}) {
           l.knee.rotation.x = (l.front ? 0.9 : -0.6) + Math.max(0, Math.sin(ph + 1.3)) * 0.8 * (l.front ? 1 : -1);
         });
         tailLift = -0.4; wagAmp = 0.25;
-        tongue.visible = false;
+        tongue.visible = false; mouthOpen = 0.04;
       } else {
         landTime += dt;
         if (landTime > 0.5 && landTime < 0.6 && wet > 0.6) api.shake();
@@ -218,7 +269,9 @@ export function createDog(opts = {}) {
         rig.position.y = Math.abs(Math.sin(gait)) * 0.04 * run;
         rig.rotation.x = Math.sin(gait * 2) * 0.03 * run;
         wagSpeed = 8 + run * 6; wagAmp = 0.55; tailLift = 0.15;
-        tongue.visible = true; tongue.scale.y = 1 + Math.sin(t * 9) * 0.25;
+        tongue.visible = true;
+        mouthOpen = 0.32 + run * 0.12 + Math.sin(t * 9) * 0.05; // panting
+        idle = Math.abs(speed) < 0.2 ? idle + dt : 0;
       }
 
       // tail wag travels down the chain
@@ -237,6 +290,14 @@ export function createDog(opts = {}) {
         rig.rotation.z = inWater ? Math.sin(t * 1.7) * 0.04 : 0;
         neck.rotation.z = 0; tailRoot.rotation.z = 0;
       }
+      // jaw, tongue, blink, happy squint
+      jaw.rotation.x = THREE.MathUtils.lerp(jaw.rotation.x, mouthOpen, 1 - Math.exp(-dt * 10));
+      tongue.rotation.x = 0.35 + jaw.rotation.x * 0.8;
+      tongue.scale.z = 1 + Math.sin(t * 9) * 0.08;
+      blinkT -= dt; if (blinkT < -0.14) blinkT = 2.5 + Math.random() * 3;
+      const bliss = !inWater && idle > 2.5 ? THREE.MathUtils.smoothstep(Math.sin(idle * 0.6), 0.2, 0.6) : 0; // eyes-closed contentment
+      const shut = Math.max(blinkT < 0 ? 1 : 0, bliss, inWater ? 0 : 0.12, shakeT > 0 ? 0.9 : 0);
+      eyes.forEach((e) => (e.lid.rotation.x = THREE.MathUtils.lerp(e.lid.rotation.x, -0.9 + shut * 1.85, 1 - Math.exp(-dt * 25))));
       head.rotation.x = inWater ? 0.15 + Math.sin(t * 2.6 + 0.5) * 0.04 : 0.05 + Math.sin(gait * 2) * 0.04 * run;
       splashT = Math.max(0, splashT - dt);
 

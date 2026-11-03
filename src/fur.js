@@ -10,10 +10,12 @@ export function makeFur(geometry, {
   const P = base.attributes.position.array, N = base.attributes.normal.array;
   const n = P.length / 3;
   const C = base.attributes.color ? base.attributes.color.array : null;
+  const A = base.attributes.aLen ? base.attributes.aLen.array : null; // per-vertex fur length multiplier
   const pos = new Float32Array(P.length * shells), nor = new Float32Array(N.length * shells), sh = new Float32Array(n * shells);
   const col = C ? new Float32Array(C.length * shells) : null;
+  const len = new Float32Array(n * shells).fill(1);
   for (let s = 0; s < shells; s++) {
-    pos.set(P, s * P.length); nor.set(N, s * N.length); if (col) col.set(C, s * C.length);
+    pos.set(P, s * P.length); nor.set(N, s * N.length); if (col) col.set(C, s * C.length); if (A) len.set(A, s * n);
     sh.fill((s + 1) / shells, s * n, (s + 1) * n);
   }
   const geo = new THREE.BufferGeometry();
@@ -21,6 +23,7 @@ export function makeFur(geometry, {
   geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   geo.setAttribute('aShell', new THREE.BufferAttribute(sh, 1));
   if (col) geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setAttribute('aLen', new THREE.BufferAttribute(len, 1));
 
   const uniforms = {
     uLen: { value: length }, uDensity: { value: density }, uWet: { value: 0 },
@@ -31,13 +34,13 @@ export function makeFur(geometry, {
     Object.assign(sh.uniforms, uniforms);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>
-        attribute float aShell;
+        attribute float aShell; attribute float aLen;
         uniform float uLen, uWet, uCurl, uDroop;
         varying float vShell; varying vec3 vBase; varying vec3 vN;`)
       .replace('#include <begin_vertex>', `
         vec3 transformed = vec3(position);
         vBase = position; vN = normal; vShell = aShell;
-        float L = uLen * (1.0 - uWet * 0.55);
+        float L = uLen * aLen * (1.0 - uWet * 0.55);
         vec3 g = normalize(transpose(mat3(modelMatrix)) * vec3(0.0, -1.0, 0.0));
         transformed += normal * aShell * L;
         transformed += g * aShell * aShell * L * (uDroop + uWet * 0.9);

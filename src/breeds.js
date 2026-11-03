@@ -41,9 +41,9 @@ export const BREEDS = {
     mark: (p, part) => {
       if (part === 'body') return Math.max(under(p, -0.02, 0.06), THREE.MathUtils.smoothstep(p.z, 0.3, 0.5) * under(p, 0.12));
       if (part === 'head') {
-        const mask = p.z > 0.06 || p.y < -0.04 ? 1 : 0;               // white muzzle + jaw
-        const spectacles = Math.hypot(Math.abs(p.x) - 0.08, p.y - 0.06) < 0.045 ? 1 : 0;
-        const stripe = Math.abs(p.x) < 0.025 && p.y > 0.02 ? 1 : 0;   // white forehead blaze
+        const mask = p.y < -0.01 || (p.z > 0.13 && p.y < 0.04) ? 1 : 0; // white muzzle, cheeks, jaw
+        const spectacles = Math.hypot(Math.abs(p.x) - 0.065, p.y - 0.035) < 0.03 && p.z > 0.05 ? 1 : 0;
+        const stripe = Math.abs(p.x) < 0.018 && p.z > 0.05 ? 1 : 0;   // white forehead blaze
         return Math.max(mask, spectacles, stripe);
       }
       return part === 'leg' ? 1 : part === 'tailTip' ? 1 : 0;

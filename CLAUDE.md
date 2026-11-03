@@ -13,7 +13,11 @@
   into the fur via vertex colors, two-segment legs, breed ears (flop/erect/bat) and tails
   (feather/plume/otter/pom/stub), collars/harnesses, shell fur with wet clumping, swim/walk/run/shake.
   10 breeds in breeds.js; keys 1–0 swap the player's breed; `?showroom` lines them all up,
-  `?showroom=husky` gives a close-up. Next: refine faces (brow, lips, cheeks) against paintings 9–16.
+  `?showroom=husky` gives a close-up. Faces (step 4): carved eye sockets, brows, cheeks, lips/flews, Frenchie wrinkles,
+  nose with nostrils, iris/pupil/catch-light eyes with lids (blink, happy squint, eyes-closed
+  bliss when idle on land), hinged jaw that pants with tongue out, short muzzle fur via aLen.
+  `?showroom=golden&face` = portrait camera. Next: in-the-moment poses (sit, lie on rocks),
+  leash walking (level 5), richer foliage to match paintings 11, 14, 15.
 - `reference/` — Ian's 16 target paintings. Compare screenshots against these.
   - 1–8: swimming hole, greenbelt creek, off-leash park, Violet Crown Trail arch
   - 9: French bulldog (fawn, black mask, blue harness) + red doodle lounging on granite boulders

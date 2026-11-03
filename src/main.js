@@ -257,6 +257,7 @@ addEventListener('pointerup', () => (drag = null));
 // ---------- Showroom (?showroom): every breed lined up on the beach ----------
 const SHOWROOM = new URLSearchParams(location.search).has('showroom');
 const SOLO = new URLSearchParams(location.search).get('showroom'); // ?showroom=husky for a close-up
+const FACE = new URLSearchParams(location.search).has('face');     // add &face for a portrait
 const lineup = [];
 if (SHOWROOM) {
   (BREED_ORDER.includes(SOLO) ? [SOLO] : BREED_ORDER).forEach((k, i) => {
@@ -335,9 +336,15 @@ function tick() {
   if (SHOWROOM) {
     lineup.forEach((d) => { d.update(dt, 0, false, groundHeight(d.group.position.x, d.group.position.z)); d.setFurDetail(24); });
     if (lineup.length === 1) {
-      const d = lineup[0].group.position;
-      camera.position.set(d.x - 1.2, d.y + 0.35, d.z + 2.0);
-      camera.lookAt(d.x, d.y - 0.05, d.z);
+      const g = lineup[0].group, d = g.position, ry = g.rotation.y;
+      if (FACE) { // 3/4 portrait of the face, like the close-up paintings
+        const hp = new THREE.Vector3(); g.children[0].children.find((c) => c.position.z > 0.6).getWorldPosition(hp);
+        camera.position.set(hp.x + Math.sin(ry + 0.55) * 0.95, hp.y + 0.08, hp.z + Math.cos(ry + 0.55) * 0.95);
+        camera.lookAt(hp.x, hp.y - 0.02, hp.z);
+      } else {
+        camera.position.set(d.x - 1.2, d.y + 0.35, d.z + 2.0);
+        camera.lookAt(d.x, d.y - 0.05, d.z);
+      }
     } else {
       camera.position.set(34.4, groundHeight(34, 13) + 1.6, 13.5);
       camera.lookAt(34.4, groundHeight(34, 7) + 0.3, 6.8);
