@@ -1,0 +1,1117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pawbound</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: a camp-journal HUD — sticky resource bar, tabbed screens, one focused panel at a time; battles take over the screen. */
+:root {
+  --void: #110e1c;        /* page ground: the night before the void */
+  --dusk: #1c1730;        /* panels */
+  --dusk-2: #262040;      /* raised controls */
+  --line: #3a3158;        /* hairlines */
+  --bone: #efe6d6;        /* primary text */
+  --bone-dim: #b3a9c4;    /* secondary text */
+  --kibble: #f2a541;      /* accent: warm amber */
+  --kibble-ink: #2a1a05;
+  --rift: #b04cff;        /* monsters / void */
+  --heal: #6fd18a;
+  --hurt: #ff6b6b;
+  --stam: #5fb8ff;
+  --font-display: "Lilita One", "Arial Rounded MT Bold", "Trebuchet MS", sans-serif;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--void); color: var(--bone);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.45;
+  background-image: radial-gradient(ellipse at 80% -10%, rgba(176,76,255,.18), transparent 55%),
+                    radial-gradient(ellipse at 0% 110%, rgba(242,165,65,.10), transparent 50%);
+  background-attachment: fixed;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--dusk); }
+button { font: inherit; color: inherit; }
+button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--kibble); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 400; letter-spacing: .5px; text-wrap: balance; margin: 0; }
+.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* HUD */
+.hud { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--dusk); border-bottom: 1px solid var(--line); }
+.hud .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding-block: 10px; }
+.logo { font-family: var(--font-display); font-size: 26px; color: var(--kibble); line-height: 1; display: flex; align-items: center; gap: 8px; }
+.logo small { font-family: var(--font-body); font-size: 12px; color: var(--bone-dim); letter-spacing: 1.5px; text-transform: uppercase; }
+.res { display: flex; gap: 14px; flex-wrap: wrap; margin-left: auto; }
+.res span { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-data); font-size: 14px; }
+.res b { font-family: var(--font-body); font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--bone-dim); font-weight: 700; }
+.tabs { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 8px; }
+.tab { background: none; border: 0; padding: 8px 14px; border-radius: 999px; cursor: pointer; color: var(--bone-dim); font-weight: 700; white-space: nowrap; }
+.tab[aria-selected="true"] { background: var(--kibble); color: var(--kibble-ink); }
+.tab:hover:not([aria-selected="true"]) { color: var(--bone); background: var(--dusk-2); }
+
+main { padding-block: 18px 60px; }
+.screen { display: grid; gap: 16px; }
+.panel { background: var(--dusk); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; min-width: 0; }
+.panel h2 { font-size: 22px; margin-bottom: 4px; }
+.sub { color: var(--bone-dim); margin: 0 0 12px; }
+.eyebrow { font-size: 11px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--bone-dim); font-weight: 700; }
+
+.btn { background: var(--dusk-2); border: 1px solid var(--line); border-radius: 8px; padding: 9px 14px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover:not(:disabled) { border-color: var(--kibble); }
+.btn.primary { background: var(--kibble); color: var(--kibble-ink); border-color: var(--kibble); }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
+.btn.danger { border-color: var(--hurt); color: var(--hurt); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn .cost { font-family: var(--font-data); font-size: 12px; opacity: .8; font-weight: 500; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* Kennel */
+.kennel { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 760px) { .kennel { grid-template-columns: 1fr; } }
+.doggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.dogcard { background: var(--dusk-2); border: 1px solid var(--line); border-radius: var(--r); padding: 10px; cursor: pointer; display: grid; justify-items: center; gap: 2px; text-align: center; position: relative; }
+.dogcard[aria-pressed="true"] { border-color: var(--kibble); box-shadow: 0 0 0 1px var(--kibble) inset; }
+.dogcard .nm { font-weight: 700; }
+.dogcard .br { font-size: 12px; color: var(--bone-dim); }
+.badge { display: inline-block; font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; font-weight: 700; border-radius: 999px; padding: 2px 8px; border: 1px solid currentColor; }
+.b-puppy { color: #ffd36b; } .b-adult { color: var(--heal); } .b-senior { color: #c7b8ff; }
+.b-party { color: var(--kibble); }
+.dogcard .partymark { position: absolute; top: 6px; right: 8px; font-size: 11px; color: var(--kibble); font-weight: 700; }
+.bondbar, .bar { height: 7px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; width: 100%; }
+.bondbar i, .bar i { display: block; height: 100%; background: var(--kibble); border-radius: 99px; transition: width .3s; }
+.bar.hp i { background: var(--heal); } .bar.st i { background: var(--stam); } .bar.ehp i { background: var(--rift); }
+
+.detail { display: grid; gap: 12px; align-content: start; }
+.dhead { display: flex; gap: 14px; align-items: center; }
+.dhead h2 { font-size: 26px; }
+.statgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { background: var(--dusk-2); border-radius: 8px; padding: 8px 10px; }
+.stat .k { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--bone-dim); font-weight: 700; }
+.stat .v { font-family: var(--font-data); font-size: 18px; }
+.stat .h { font-size: 12px; color: var(--bone-dim); }
+.pips { color: var(--kibble); letter-spacing: 2px; }
+.pips .off { color: var(--line); }
+.movelist { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 12.5px; background: var(--dusk-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+.chip.sig { border-color: var(--kibble); color: var(--kibble); }
+.chip.locked { opacity: .45; border-style: dashed; }
+.lifeline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.lifeline div { height: 8px; border-radius: 4px; background: rgba(255,255,255,.08); position: relative; overflow: hidden; }
+.lifeline div i { position: absolute; inset: 0 auto 0 0; background: var(--bone-dim); }
+.lifelabels { display: grid; grid-template-columns: repeat(3, 1fr); font-size: 11px; color: var(--bone-dim); letter-spacing: 1px; text-transform: uppercase; }
+.trait { border-left: 3px solid var(--kibble); padding: 4px 10px; background: rgba(242,165,65,.06); border-radius: 0 6px 6px 0; }
+
+/* Adopt / book */
+.shop { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+.shopcard { background: var(--dusk-2); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 8px; justify-items: center; text-align: center; }
+.rarity-common { color: var(--bone-dim); } .rarity-uncommon { color: var(--stam); } .rarity-rare { color: var(--kibble); }
+.book { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.bookcell { text-align: center; padding: 8px; border-radius: 8px; background: var(--dusk-2); font-size: 12.5px; }
+.bookcell.missing svg { filter: brightness(0) opacity(.35); }
+.bookcell.missing .bn { color: var(--bone-dim); }
+
+/* Map */
+.mapwrap { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; }
+@media (max-width: 860px) { .mapwrap { grid-template-columns: 1fr; } }
+canvas#map { width: 100%; max-width: 100%; height: auto; display: block; border-radius: var(--r); border: 1px solid var(--line); image-rendering: pixelated; touch-action: manipulation; background: #0a0812; }
+.dpad { display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 52px); gap: 4px; justify-content: center; }
+.dpad button { border-radius: 10px; background: var(--dusk-2); border: 1px solid var(--line); font-size: 20px; cursor: pointer; }
+.side { display: grid; gap: 12px; align-content: start; }
+.mini { display: flex; gap: 8px; align-items: center; }
+.mini .meta { flex: 1; min-width: 0; display: grid; gap: 3px; font-size: 13px; }
+.legend { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 13px; color: var(--bone-dim); }
+.party-pick { display: flex; flex-wrap: wrap; gap: 8px; }
+.party-pick .dogcard { width: 140px; }
+
+/* Battle */
+.battle { position: fixed; inset: 0; z-index: 20; background: rgba(10,8,18,.96); overflow-y: auto; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.battle .wrap { padding-block: 16px; display: grid; gap: 14px; }
+.arena { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 640px) { .arena { grid-template-columns: 1fr; } }
+.side-col { display: grid; gap: 10px; align-content: start; }
+.fighter { display: flex; gap: 10px; align-items: center; background: var(--dusk); border: 1px solid var(--line); border-radius: var(--r); padding: 8px 10px; transition: transform .15s; }
+.fighter.active { border-color: var(--kibble); box-shadow: 0 0 0 1px var(--kibble) inset, 0 0 24px rgba(242,165,65,.18); }
+.fighter.down { opacity: .38; filter: grayscale(1); }
+.fighter.targetable { cursor: pointer; }
+.fighter.targeted { border-color: var(--rift); box-shadow: 0 0 0 1px var(--rift) inset, 0 0 24px rgba(176,76,255,.25); }
+.fighter .meta { flex: 1; min-width: 0; display: grid; gap: 3px; font-size: 13px; }
+.fighter .nm { font-weight: 700; font-size: 14px; display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+.tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.tag { font-size: 10.5px; padding: 1px 6px; border-radius: 4px; background: var(--dusk-2); color: var(--bone-dim); }
+.shake { animation: shake .35s; }
+.flash { animation: flash .4s; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+@keyframes flash { 0%{filter:brightness(2.2)} 100%{filter:none} }
+@media (prefers-reduced-motion: reduce) { .shake, .flash { animation: none; } }
+.moves { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.move { text-align: left; background: var(--dusk-2); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; cursor: pointer; display: grid; gap: 2px; }
+.move:hover:not(:disabled) { border-color: var(--kibble); }
+.move.sig { border-color: rgba(242,165,65,.5); }
+.move:disabled { opacity: .35; cursor: not-allowed; }
+.move .t { font-weight: 700; display: flex; justify-content: space-between; gap: 6px; }
+.move .t .cost { font-family: var(--font-data); color: var(--stam); font-size: 12px; }
+.move .d { font-size: 12px; color: var(--bone-dim); }
+.blog { font-size: 13.5px; max-height: 150px; overflow-y: auto; display: grid; gap: 2px; background: var(--dusk); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; }
+.blog .miss { color: var(--bone-dim); } .blog .bad { color: var(--hurt); } .blog .good { color: var(--heal); } .blog .void { color: #d29bff; } .blog .pup { color: #ffd36b; }
+
+/* Toast + modal */
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--bone); color: var(--void); padding: 10px 16px; border-radius: 999px; font-weight: 700; z-index: 40; max-width: calc(100% - 32px); text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
+.modal { position: fixed; inset: 0; z-index: 30; background: rgba(8,6,14,.8); display: grid; place-items: center; padding: 16px; }
+.modal .panel { max-width: 520px; width: 100%; display: grid; gap: 12px; }
+
+/* Start */
+.hero { text-align: center; display: grid; gap: 10px; justify-items: center; padding-block: 18px 6px; }
+.hero h1 { font-size: clamp(44px, 9vw, 84px); color: var(--kibble); line-height: .95; }
+.hero p { max-width: 58ch; color: var(--bone-dim); margin: 0; }
+.starters { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+
+/* Guide */
+.cmp { width: 100%; border-collapse: collapse; font-size: 14px; }
+.cmp th, .cmp td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.cmp th { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--bone-dim); }
+.tablewrap { overflow-x: auto; }
+.guide p { max-width: 68ch; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+"use strict";
+// ============================================================
+// DATA
+// ============================================================
+const STAGES = {
+  puppy:  { label: 'Puppy',  stamina: 30, acc: 0.62, cost: 1.25, wis: 2, pow: 0.85, hp: 0.8, obey: 0.55,
+            energy: 3, balance: 1, wisdom: 1, blurb: 'Bursting with energy but clumsy, and doesn’t always listen.' },
+  adult:  { label: 'Adult',  stamina: 12, acc: 0.93, cost: 0.75, wis: 4, pow: 1.15, hp: 1.0, obey: 0.97,
+            energy: 2, balance: 3, wisdom: 2, blurb: 'Balanced and capable: lands its moves and spends stamina carefully.' },
+  senior: { label: 'Senior', stamina: 8,  acc: 0.88, cost: 0.85, wis: 8, pow: 1.0, hp: 0.9, obey: 1.0,
+            energy: 1, balance: 2, wisdom: 3, blurb: 'Wise, with the biggest bag of tricks, but tires quickly.' },
+};
+const ADULT_AT = 6, SENIOR_AT = 18; // age in days
+
+const BREEDS = {
+  golden:     { name: 'Golden Retriever', rarity: 'common',   hp: 46, atk: 9,  def: 4, ears: 'floppy', coat: '#e0a84f', muzzle: '#f3d39a', ear: '#c98b33', sig: 'nuzzle',  trait: 'Warm Heart',      traitDesc: 'Heals 25% more.' },
+  corgi:      { name: 'Corgi',            rarity: 'common',   hp: 38, atk: 8,  def: 4, ears: 'pointy', coat: '#e08a3c', muzzle: '#fbf3e6', ear: '#c9702a', blaze: '#fbf3e6', sig: 'loaf', trait: 'Lucky Loaf', traitDesc: '+30% coins found.' },
+  beagle:     { name: 'Beagle',           rarity: 'common',   hp: 40, atk: 8,  def: 4, ears: 'long',   coat: '#c27a3a', muzzle: '#f7f1e6', ear: '#6b3f1d', blaze: '#f7f1e6', sig: 'scent', trait: 'Super Sniffer', traitDesc: 'Party sees 2 tiles farther and sniffs out chests.' },
+  dachshund:  { name: 'Dachshund',        rarity: 'common',   hp: 36, atk: 9,  def: 5, ears: 'long',   coat: '#8a4a22', muzzle: '#a65d2e', ear: '#5e2f14', sig: 'burrow', trait: 'Stubborn', traitDesc: 'Takes 25% less damage below half health.' },
+  shepherd:   { name: 'German Shepherd',  rarity: 'uncommon', hp: 48, atk: 11, def: 6, ears: 'pointy', coat: '#b5793d', muzzle: '#2b2220', ear: '#2b2220', mask: '#2b2220', sig: 'shield', trait: 'Steadfast', traitDesc: '+20% defense.' },
+  collie:     { name: 'Border Collie',    rarity: 'uncommon', hp: 40, atk: 10, def: 4, ears: 'semi',   coat: '#24212a', muzzle: '#f4f1ea', ear: '#24212a', blaze: '#f4f1ea', sig: 'herd', trait: 'Sharp Eye', traitDesc: '+8% accuracy.' },
+  husky:      { name: 'Siberian Husky',   rarity: 'uncommon', hp: 44, atk: 10, def: 4, ears: 'pointy', coat: '#6c7280', muzzle: '#f2f2f2', ear: '#4a4f5a', blaze: '#f2f2f2', eyes: '#7cc7ff', sig: 'blizzard', trait: 'Endless Run', traitDesc: '+25% stamina.' },
+  rottweiler: { name: 'Rottweiler',       rarity: 'uncommon', hp: 52, atk: 12, def: 5, ears: 'floppy', coat: '#1f1a19', muzzle: '#a0622d', ear: '#1f1a19', sig: 'ironjaw', trait: 'Power Bite', traitDesc: '+15% attack.' },
+  greyhound:  { name: 'Greyhound',        rarity: 'uncommon', hp: 36, atk: 10, def: 3, ears: 'fold',   coat: '#9a9aa6', muzzle: '#b6b6c0', ear: '#7a7a86', sig: 'blur', trait: 'Swift', traitDesc: '15% chance to dodge any attack.' },
+  poodle:     { name: 'Poodle',           rarity: 'rare',     hp: 38, atk: 9,  def: 4, ears: 'poof',   coat: '#f2ece4', muzzle: '#f7f3ee', ear: '#e3d8ca', sig: 'feint', trait: 'Clever', traitDesc: 'Knows one extra move at every life stage.' },
+  greatdane:  { name: 'Great Dane',       rarity: 'rare',     hp: 58, atk: 11, def: 5, ears: 'floppy', coat: '#4a5060', muzzle: '#2f333d', ear: '#2f333d', sig: 'giant', trait: 'Big Heart', traitDesc: '+30% health.' },
+  shiba:      { name: 'Shiba Inu',        rarity: 'rare',     hp: 40, atk: 10, def: 4, ears: 'pointy', coat: '#d9822b', muzzle: '#fbf0df', ear: '#b96a1c', blaze: '#fbf0df', sig: 'scream', trait: 'Unbothered', traitDesc: 'Immune to void stamina drain.' },
+  bernese:    { name: 'Bernese Mountain Dog', rarity: 'rare', hp: 54, atk: 10, def: 6, ears: 'floppy', coat: '#1d1918', muzzle: '#f6f1ea', ear: '#1d1918', blaze: '#f6f1ea', cheek: '#b5652b', sig: 'barrel', trait: 'Mountain Rescuer', traitDesc: '+1 treat after every battle won.' },
+};
+const PRICE = { common: 40, uncommon: 85, rare: 160 };
+
+const MOVES = {
+  bite:     { name: 'Bite',          cost: 2, kind: 'dmg',   pow: 1.0,  desc: 'A solid chomp.' },
+  zoomies:  { name: 'Zoomies',       cost: 3, kind: 'multi', pow: 0.45, hits: [2, 4], desc: '2–4 wild hits on random monsters.' },
+  tackle:   { name: 'Tackle',        cost: 3, kind: 'dmg',   pow: 1.45, desc: 'Heavy body slam.' },
+  guard:    { name: 'Guard',         cost: 1, kind: 'guard', desc: 'Take half damage and draw attacks this round.' },
+  bark:     { name: 'Big Bark',      cost: 2, kind: 'weakenAll', desc: 'All monsters deal 30% less for 2 rounds.' },
+  lick:     { name: 'Healing Lick',  cost: 2, kind: 'heal',  amt: 0.3, desc: 'Heal the most hurt ally by 30%.' },
+  howl:     { name: 'Pack Howl',     cost: 3, kind: 'buffAll', desc: 'Party deals 30% more for 3 rounds.' },
+  oldtrick: { name: 'Old Dog Trick', cost: 2, kind: 'stamAll', amt: 4, desc: 'Coach the pack: every other dog gets +4 stamina.' },
+  rest:     { name: 'Rest',          cost: 0, kind: 'rest',  desc: 'Pant it out: recover half your stamina.' },
+  // signatures (unlock at Adult)
+  nuzzle:   { sig: true, name: 'Sunny Nuzzle',   cost: 3, kind: 'healAll', amt: 0.2, desc: 'Heal the whole party by 20%.' },
+  shield:   { sig: true, name: 'Shield Wall',    cost: 3, kind: 'guardAll', desc: 'The whole party takes half damage this round.' },
+  herd:     { sig: true, name: 'Herding Circle', cost: 3, kind: 'stun', pow: 0.6, chance: 0.75, desc: 'Light hit; 75% chance the monster loses its turn.' },
+  blizzard: { sig: true, name: 'Blizzard Howl',  cost: 4, kind: 'aoe', pow: 0.8, desc: 'Hit every monster.' },
+  loaf:     { sig: true, name: 'Lucky Loaf',     cost: 2, kind: 'dmg', pow: 1.1, coins: 6, desc: 'A bouncing hit that knocks coins loose.' },
+  scent:    { sig: true, name: 'Scent Lock',     cost: 2, kind: 'mark', desc: 'Target takes 50% more damage for 3 rounds.' },
+  ironjaw:  { sig: true, name: 'Iron Jaw',       cost: 5, kind: 'dmg', pow: 2.1, desc: 'A crushing bite.' },
+  blur:     { sig: true, name: 'Blur Dash',      cost: 4, kind: 'multi', pow: 0.7, hits: [3, 3], desc: 'Three lightning hits.' },
+  burrow:   { sig: true, name: 'Burrow Strike',  cost: 3, kind: 'dmgGuard', pow: 1.2, desc: 'Strike from below, then dig in (Guard).' },
+  feint:    { sig: true, name: 'Clever Feint',   cost: 2, kind: 'dmg', pow: 1.1, sure: true, desc: 'Never misses.' },
+  giant:    { sig: true, name: 'Gentle Giant',   cost: 3, kind: 'tauntHeal', amt: 0.25, desc: 'Draw every attack and heal self 25%.' },
+  scream:   { sig: true, name: 'Shiba Scream',   cost: 3, kind: 'weakenAll', stunChance: 0.3, desc: 'All monsters weakened; 30% chance each is stunned.' },
+  barrel:   { sig: true, name: 'Rescue Barrel',  cost: 5, kind: 'revive', amt: 0.4, desc: 'Revive a fainted ally at 40% health.' },
+};
+const ALLY_KINDS = new Set(['guard', 'heal', 'healAll', 'buffAll', 'stamAll', 'rest', 'guardAll', 'tauntHeal', 'revive', 'weakenAll', 'aoe']);
+const PUPPY_ORDER = ['bite', 'zoomies', 'bark', 'guard'];
+const GROWN_ORDER = ['bite', 'tackle', 'guard', 'SIG', 'bark', 'lick', 'howl', 'oldtrick', 'zoomies'];
+
+const MONSTERS = {
+  wisp:    { name: 'Void Wisp',    hp: 22, atk: 6,  def: 1, xp: 7,  abil: 'drain', shape: 'wisp' },
+  shade:   { name: 'Shade Hound',  hp: 34, atk: 9, def: 3, xp: 9,  abil: 'bite',  shape: 'shade' },
+  crow:    { name: 'Hollow Crow',  hp: 26, atk: 8,  def: 2, xp: 8,  abil: 'swoop', shape: 'crow' },
+  crawler: { name: 'Null Crawler', hp: 48, atk: 8,  def: 7, xp: 11, abil: 'slam',  shape: 'crawler' },
+  maw:     { name: 'Rift Maw',     hp: 170, atk: 14, def: 6, xp: 45, abil: 'boss', shape: 'maw', boss: true },
+};
+const NAMES = ['Biscuit','Mochi','Pepper','Juniper','Waffles','Scout','Hazel','Bruno','Pickles','Nova','Ziggy','Maple','Tater','Olive','Rocket','Clover','Bean','Sable','Pretzel','Otis','Luna','Fig','Moose','Pip','Ripley','Nugget','Echo','Bramble','Dot','Huckle','Kona','Wren'];
+const BOND_TIERS = [[80, 'Best Friend'], [50, 'Loyal'], [25, 'Friendly'], [0, 'Wary']];
+
+// ============================================================
+// STATE
+// ============================================================
+const SAVE_KEY = 'pawbound-save-v1';
+let S = null;          // persistent game state
+let ui = { tab: 'kennel', sel: null, toast: null, modal: null };
+let run = null;        // active expedition (also persisted inside S.run)
+let B = null;          // active battle (transient)
+
+const rnd = (a, b) => a + Math.random() * (b - a);
+const rint = (a, b) => Math.floor(rnd(a, b + 1));
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function save() {
+  try { S.run = run; localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* storage unavailable */ }
+}
+function load() {
+  try { const raw = localStorage.getItem(SAVE_KEY); if (raw) return JSON.parse(raw); } catch (e) {}
+  return null;
+}
+function newState() {
+  return { day: 1, coins: 60, treats: 6, care: 3, dogs: [], party: [], shop: [], nextId: 1, maxDepth: 1, started: false, seen: {}, wins: 0, run: null };
+}
+function makeDog(breed, opts = {}) {
+  const used = new Set(S.dogs.map(d => d.name));
+  const free = NAMES.filter(n => !used.has(n));
+  return { id: S.nextId++, name: opts.name || pick(free.length ? free : NAMES), breed, age: opts.age ?? 0, bond: opts.bond ?? 15,
+           trail: !!opts.trail, lvl: opts.lvl || 1, xp: 0, trainings: 0 };
+}
+function rollShop() {
+  const keys = Object.keys(BREEDS);
+  const w = k => BREEDS[k].rarity === 'common' ? 5 : BREEDS[k].rarity === 'uncommon' ? 3 : 1.4;
+  const out = [];
+  while (out.length < 3) {
+    let total = keys.reduce((a, k) => a + (out.includes(k) ? 0 : w(k)), 0), r = Math.random() * total;
+    for (const k of keys) { if (out.includes(k)) continue; r -= w(k); if (r <= 0) { out.push(k); break; } }
+  }
+  S.shop = out.map(k => ({ breed: k, sold: false }));
+}
+
+// ============================================================
+// DOG MATH
+// ============================================================
+const stageOf = d => d.age < ADULT_AT ? 'puppy' : d.age < SENIOR_AT ? 'adult' : 'senior';
+const bondTier = b => BOND_TIERS.find(([t]) => b >= t)[1];
+function stats(d) {
+  const br = BREEDS[d.breed], st = STAGES[stageOf(d)], lv = 1 + 0.08 * (d.lvl - 1);
+  let hp = br.hp * st.hp * (1 + 0.1 * (d.lvl - 1));
+  let atk = br.atk * st.pow * lv, def = br.def * lv, stamina = st.stamina;
+  let acc = st.acc + Math.min(0.06, d.bond / 1600);
+  if (d.breed === 'greatdane') hp *= 1.3;
+  if (d.breed === 'shepherd') def *= 1.2;
+  if (d.breed === 'rottweiler') atk *= 1.15;
+  if (d.breed === 'husky') stamina = Math.round(stamina * 1.25);
+  if (d.breed === 'collie') acc += 0.08;
+  return { hp: Math.round(hp), atk, def, stamina, acc: Math.min(0.99, acc), costMult: st.cost };
+}
+function moveCost(d, key) { const m = MOVES[key]; return m.cost === 0 ? 0 : Math.max(1, Math.round(m.cost * STAGES[stageOf(d)].cost)); }
+function movesOf(d) {
+  const stage = stageOf(d), extra = d.breed === 'poodle' ? 1 : 0;
+  const n = STAGES[stage].wis + extra;
+  const order = stage === 'puppy' ? PUPPY_ORDER : GROWN_ORDER;
+  return order.slice(0, n).map(k => k === 'SIG' ? BREEDS[d.breed].sig : k);
+}
+function lockedMovesOf(d) {
+  const have = new Set(movesOf(d));
+  const all = [...new Set([...GROWN_ORDER.map(k => k === 'SIG' ? BREEDS[d.breed].sig : k)])];
+  return all.filter(k => !have.has(k));
+}
+function avgMovesPerTank(d) {
+  const s = stats(d), ks = movesOf(d).filter(k => MOVES[k].kind !== 'guard');
+  const avg = ks.reduce((a, k) => a + moveCost(d, k), 0) / ks.length;
+  return Math.floor(s.stamina / avg);
+}
+function disobeyChance(d) {
+  const st = STAGES[stageOf(d)];
+  if (st.obey >= 1) return 0;
+  const base = (1 - st.obey) * (1 - d.bond / 180) - d.trainings * 0.025;
+  return clamp(base, stageOf(d) === 'puppy' ? 0.08 : 0, 0.6);
+}
+const xpNeed = lvl => 20 + lvl * 15;
+function giveXP(d, n) {
+  d.xp += n; const ups = [];
+  while (d.xp >= xpNeed(d.lvl) && d.lvl < 30) { d.xp -= xpNeed(d.lvl); d.lvl++; ups.push(d.lvl); }
+  return ups;
+}
+const dogById = id => S.dogs.find(d => d.id === id);
+
+// ============================================================
+// ART (SVG dog portraits + monsters)
+// ============================================================
+function dogSVG(breedKey, stage, size = 72) {
+  const b = BREEDS[breedKey];
+  const pup = stage === 'puppy', sen = stage === 'senior';
+  const hr = pup ? 27 : 29, cy = pup ? 56 : 54;
+  const eyeR = pup ? 5.2 : 3.8, eyeY = cy - 4;
+  const muzzle = sen && b.muzzle !== '#f7f3ee' ? mix(b.muzzle, '#d9d6d0', .55) : b.muzzle;
+  let ears = '';
+  const E = b.ear;
+  if (b.ears === 'pointy') ears = `<path d="M${50 - hr * .85} ${cy - hr * .35} L${50 - hr * .7} ${cy - hr * 1.45} L${50 - hr * .1} ${cy - hr * .85}Z" fill="${E}"/><path d="M${50 + hr * .85} ${cy - hr * .35} L${50 + hr * .7} ${cy - hr * 1.45} L${50 + hr * .1} ${cy - hr * .85}Z" fill="${E}"/>`;
+  else if (b.ears === 'semi') ears = `<path d="M${50 - hr * .85} ${cy - hr * .3} L${50 - hr * .75} ${cy - hr * 1.25} L${50 - hr * .15} ${cy - hr * .85}Z" fill="${E}"/><path d="M${50 + hr * .85} ${cy - hr * .3} L${50 + hr * .95} ${cy - hr * 1.1} L${50 + hr * .15} ${cy - hr * .85}Z" fill="${E}"/>`;
+  else if (b.ears === 'floppy') ears = `<ellipse cx="${50 - hr * .95}" cy="${cy - 2}" rx="${hr * .32}" ry="${hr * .62}" transform="rotate(18 ${50 - hr * .95} ${cy - 2})" fill="${E}"/><ellipse cx="${50 + hr * .95}" cy="${cy - 2}" rx="${hr * .32}" ry="${hr * .62}" transform="rotate(-18 ${50 + hr * .95} ${cy - 2})" fill="${E}"/>`;
+  else if (b.ears === 'long') ears = `<ellipse cx="${50 - hr * .98}" cy="${cy + 6}" rx="${hr * .3}" ry="${hr * .8}" transform="rotate(10 ${50 - hr} ${cy})" fill="${E}"/><ellipse cx="${50 + hr * .98}" cy="${cy + 6}" rx="${hr * .3}" ry="${hr * .8}" transform="rotate(-10 ${50 + hr} ${cy})" fill="${E}"/>`;
+  else if (b.ears === 'fold') ears = `<path d="M${50 - hr * .7} ${cy - hr * .7} q-14 -6 -12 10 q4 -4 14 0Z" fill="${E}"/><path d="M${50 + hr * .7} ${cy - hr * .7} q14 -6 12 10 q-4 -4 -14 0Z" fill="${E}"/>`;
+  else if (b.ears === 'poof') ears = `<circle cx="${50 - hr * .95}" cy="${cy + 2}" r="${hr * .45}" fill="${E}"/><circle cx="${50 + hr * .95}" cy="${cy + 2}" r="${hr * .45}" fill="${E}"/><circle cx="50" cy="${cy - hr * .95}" r="${hr * .45}" fill="${E}"/>`;
+  const mask = b.mask ? `<path d="M${50 - hr * .9} ${cy - 2} Q50 ${cy - hr * 1.3} ${50 + hr * .9} ${cy - 2} Q50 ${cy - hr * .3} ${50 - hr * .9} ${cy - 2}Z" fill="${b.mask}" opacity=".85"/>` : '';
+  const blaze = b.blaze ? `<path d="M${50 - 4} ${cy - hr * .9} Q50 ${cy - hr * 1.05} ${50 + 4} ${cy - hr * .9} L${50 + 9} ${cy + 6} L${50 - 9} ${cy + 6}Z" fill="${b.blaze}"/>` : '';
+  const cheeks = b.cheek ? `<circle cx="${50 - hr * .55}" cy="${cy + 6}" r="5" fill="${b.cheek}"/><circle cx="${50 + hr * .55}" cy="${cy + 6}" r="5" fill="${b.cheek}"/>` : '';
+  const eyeC = b.eyes || '#1a1412';
+  const shine = pup ? `<circle cx="${50 - 10}" cy="${eyeY - 2}" r="1.8" fill="#fff"/><circle cx="${50 + 12}" cy="${eyeY - 2}" r="1.8" fill="#fff"/>` : `<circle cx="${50 - 10.5}" cy="${eyeY - 1.3}" r="1.1" fill="#fff"/><circle cx="${50 + 11.5}" cy="${eyeY - 1.3}" r="1.1" fill="#fff"/>`;
+  const brows = sen ? `<path d="M${50 - 16} ${eyeY - 7} l9 -2" stroke="#ddd8cf" stroke-width="2.4" stroke-linecap="round"/><path d="M${50 + 16} ${eyeY - 7} l-9 -2" stroke="#ddd8cf" stroke-width="2.4" stroke-linecap="round"/>` : '';
+  const tongue = pup ? `<path d="M47 ${cy + 15} q3 8 6 0Z" fill="#ff7a90"/>` : '';
+  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true">
+    ${ears}<circle cx="50" cy="${cy}" r="${hr}" fill="${b.coat}"/>${mask}${blaze}${cheeks}
+    <ellipse cx="50" cy="${cy + 10}" rx="${hr * .55}" ry="${hr * .4}" fill="${muzzle}"/>
+    <circle cx="${50 - 11}" cy="${eyeY}" r="${eyeR}" fill="${eyeC}"/><circle cx="${50 + 11}" cy="${eyeY}" r="${eyeR}" fill="${eyeC}"/>${shine}${brows}
+    <ellipse cx="50" cy="${cy + 5}" rx="5.2" ry="3.8" fill="#1a1412"/>
+    <path d="M50 ${cy + 8} v4 M44 ${cy + 13} q6 4 12 0" stroke="#1a1412" stroke-width="1.6" fill="none" stroke-linecap="round"/>${tongue}
+  </svg>`;
+}
+function mix(a, b, t) {
+  const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const A = p(a), Bc = p(b);
+  return '#' + A.map((v, i) => Math.round(v + (Bc[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
+function monSVG(shape, size = 64) {
+  const glow = `<defs><radialGradient id="g${shape}" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#7b3fd6"/><stop offset="1" stop-color="#1c0b33"/></radialGradient></defs>`;
+  const eyes = (y, gap = 10, r = 4) => `<circle cx="${50 - gap}" cy="${y}" r="${r}" fill="#e9c6ff"/><circle cx="${50 + gap}" cy="${y}" r="${r}" fill="#e9c6ff"/><circle cx="${50 - gap}" cy="${y}" r="${r * .45}" fill="#fff"/><circle cx="${50 + gap}" cy="${y}" r="${r * .45}" fill="#fff"/>`;
+  let body = '';
+  if (shape === 'wisp') body = `<path d="M50 14 C70 34 74 52 66 70 C62 80 56 86 50 86 C44 86 36 80 34 70 C28 54 38 40 44 30 C46 40 48 42 50 14Z" fill="url(#g${shape})" stroke="#b04cff" stroke-width="2"/>${eyes(60, 7, 3.6)}`;
+  else if (shape === 'shade') body = `<path d="M24 40 L30 16 L40 32 L60 32 L70 16 L76 40 C82 60 72 82 50 84 C28 82 18 60 24 40Z" fill="url(#g${shape})" stroke="#b04cff" stroke-width="2"/>${eyes(52, 11, 4.5)}<path d="M40 68 l4 6 l3 -6 l3 6 l3 -6 l3 6 l4 -6" stroke="#e9c6ff" stroke-width="2" fill="none"/>`;
+  else if (shape === 'crow') body = `<path d="M50 30 L92 48 L64 52 L50 80 L36 52 L8 48Z" fill="url(#g${shape})" stroke="#b04cff" stroke-width="2"/>${eyes(46, 6, 3.4)}<path d="M50 52 l-4 6 h8z" fill="#f2a541"/>`;
+  else if (shape === 'crawler') body = `<ellipse cx="50" cy="56" rx="38" ry="24" fill="url(#g${shape})" stroke="#b04cff" stroke-width="2"/>${[18, 30, 70, 82].map(x => `<path d="M${x} 72 l${x < 50 ? -6 : 6} 14" stroke="#b04cff" stroke-width="3" stroke-linecap="round"/>`).join('')}${eyes(50, 13, 5)}<circle cx="50" cy="48" r="4" fill="#e9c6ff"/>`;
+  else if (shape === 'maw') body = `<circle cx="50" cy="50" r="42" fill="url(#g${shape})" stroke="#b04cff" stroke-width="3"/><path d="M22 56 Q50 92 78 56 Q50 70 22 56Z" fill="#0a0612"/>${[30, 40, 50, 60, 70].map(x => `<path d="M${x - 4} 59 l4 8 l4 -8" fill="#e9c6ff"/>`).join('')}${eyes(36, 16, 6)}<circle cx="50" cy="26" r="5" fill="#e9c6ff"/>`;
+  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true">${glow}${body}</svg>`;
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+const $app = () => document.getElementById('app');
+function render() {
+  if (!S.started) { $app().innerHTML = renderStart(); bind(); return; }
+  let html = renderHUD() + `<main><div class="wrap">`;
+  if (ui.tab === 'kennel') html += renderKennel();
+  else if (ui.tab === 'adopt') html += renderAdopt();
+  else if (ui.tab === 'world') html += renderWorld();
+  else if (ui.tab === 'book') html += renderBook();
+  else if (ui.tab === 'guide') html += renderGuide();
+  html += `</div></main>`;
+  if (B) html += renderBattle();
+  if (ui.modal) html += `<div class="modal" role="dialog" aria-modal="true"><div class="panel">${ui.modal}</div></div>`;
+  if (ui.toast) html += `<div class="toast" role="status">${esc(ui.toast)}</div>`;
+  $app().innerHTML = html;
+  bind();
+  if (ui.tab === 'world' && run && !B) drawMap();
+  const bl = document.querySelector('.blog'); if (bl) bl.scrollTop = bl.scrollHeight;
+}
+let toastTimer;
+function toast(msg) { ui.toast = msg; clearTimeout(toastTimer); toastTimer = setTimeout(() => { ui.toast = null; render(); }, 2600); }
+
+function renderStart() {
+  const starters = ['golden', 'shepherd', 'beagle'];
+  return `<main><div class="wrap" style="display:grid;gap:22px;padding-block:24px 60px">
+    <div class="hero">
+      <span class="eyebrow">A dog-collecting adventure</span>
+      <h1>Pawbound</h1>
+      <p>The void is leaking into the world. Collect breeds, raise them from clumsy puppies to wise old seniors, earn their trust until they become your best friend, then take a pack of three out into the wilds to dig up treasure, sniff out treats and chase off the monsters of the void.</p>
+    </div>
+    <section class="panel">
+      <h2>Choose your first best friend</h2>
+      <p class="sub">They start as a trail-trained adult who already trusts you completely.</p>
+      <div class="starters">
+        ${starters.map(k => { const b = BREEDS[k]; return `<div class="shopcard">${dogSVG(k, 'adult', 96)}
+          <h3 style="font-size:20px">${b.name}</h3>
+          <div class="trait" style="text-align:left"><b>${b.trait}.</b> ${b.traitDesc}</div>
+          <div class="sub" style="margin:0">Signature: <b style="color:var(--kibble)">${MOVES[b.sig].name}</b>. ${MOVES[b.sig].desc}</div>
+          <button class="btn primary" data-act="start" data-k="${k}">Choose ${b.name.split(' ').pop()}</button></div>`; }).join('')}
+      </div>
+    </section>
+  </div></main>`;
+}
+
+function renderHUD() {
+  const tabs = [['kennel', 'Kennel'], ['world', run ? 'Expedition' : 'Explore'], ['adopt', 'Adopt'], ['book', 'Breed Book'], ['guide', 'How it works']];
+  return `<header class="hud"><div class="wrap">
+    <div class="logo">Pawbound <small>Day <span class="num">${S.day}</span></small></div>
+    <div class="res">
+      <span><b>Coins</b> ${S.coins}</span>
+      <span><b>Treats</b> ${S.treats}</span>
+      <span><b>Care</b> ${'●'.repeat(S.care)}<span style="color:var(--line)">${'●'.repeat(3 - S.care)}</span></span>
+      <span><b>Deepest</b> ${S.maxDepth}</span>
+    </div>
+  </div>
+  <div class="wrap"><nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${ui.tab === k}" data-act="tab" data-k="${k}">${l}</button>`).join('')}</nav></div>
+  </header>`;
+}
+
+function dogCard(d, extra = '') {
+  const st = stageOf(d);
+  const inParty = S.party.includes(d.id);
+  return `<button class="dogcard" aria-pressed="${ui.sel === d.id}" data-act="sel" data-id="${d.id}" ${extra}>
+    ${inParty ? '<span class="partymark">PARTY</span>' : ''}
+    ${dogSVG(d.breed, st, 64)}
+    <span class="nm">${esc(d.name)}</span>
+    <span class="br">${BREEDS[d.breed].name} · Lv ${d.lvl}</span>
+    <span class="badge b-${st}">${STAGES[st].label}</span>
+    <span class="bondbar" title="Bond ${Math.round(d.bond)}"><i style="width:${d.bond}%"></i></span>
+    <span class="br">${bondTier(d.bond)}${d.trail ? ' · Trail ready' : ''}</span>
+  </button>`;
+}
+function pips(n) { return `<span class="pips">${'★'.repeat(n)}<span class="off">${'★'.repeat(3 - n)}</span></span>`; }
+
+function renderKennel() {
+  if (!ui.sel || !dogById(ui.sel)) ui.sel = S.dogs[0]?.id;
+  const d = dogById(ui.sel);
+  return `<div class="screen">
+    <div class="kennel">
+      <section class="panel">
+        <div class="row" style="justify-content:space-between;margin-bottom:10px">
+          <div><h2>Your kennel</h2><p class="sub" style="margin:0">${S.dogs.length} dog${S.dogs.length === 1 ? '' : 's'} · Party ${S.party.length}/3</p></div>
+          <button class="btn" data-act="endday" ${run ? 'disabled' : ''}>End day <span class="cost">rest + age</span></button>
+        </div>
+        <div class="doggrid">${S.dogs.map(x => dogCard(x)).join('')}</div>
+      </section>
+      ${d ? renderDetail(d) : ''}
+    </div>
+  </div>`;
+}
+
+function renderDetail(d) {
+  const st = stageOf(d), s = stats(d), STG = STAGES[st], br = BREEDS[d.breed];
+  const inParty = S.party.includes(d.id), best = d.bond >= 80;
+  const lifePct = [clamp(d.age / ADULT_AT, 0, 1), clamp((d.age - ADULT_AT) / (SENIOR_AT - ADULT_AT), 0, 1), d.age >= SENIOR_AT ? 1 : 0];
+  const nextStage = st === 'puppy' ? `Grows up in ${ADULT_AT - d.age} day${ADULT_AT - d.age === 1 ? '' : 's'}` : st === 'adult' ? `Becomes a senior in ${SENIOR_AT - d.age} day${SENIOR_AT - d.age === 1 ? '' : 's'}` : 'A wise old soul';
+  const ob = disobeyChance(d);
+  const busy = !!run;
+  return `<section class="panel detail">
+    <div class="dhead">${dogSVG(d.breed, st, 96)}
+      <div style="display:grid;gap:4px;min-width:0">
+        <h2>${esc(d.name)}</h2>
+        <div class="row"><span class="badge b-${st}">${STG.label}</span><span class="br" style="color:var(--bone-dim);font-size:13px">${br.name} · <span class="rarity-${br.rarity}">${br.rarity}</span></span></div>
+        <div style="font-size:13px;color:var(--bone-dim)">Level ${d.lvl} · XP <span class="num">${d.xp}/${xpNeed(d.lvl)}</span> · Age ${d.age}d</div>
+      </div>
+    </div>
+    <div>
+      <div class="lifelabels"><span>Puppy</span><span>Adult</span><span>Senior</span></div>
+      <div class="lifeline">${lifePct.map(p => `<div><i style="width:${p * 100}%"></i></div>`).join('')}</div>
+      <div style="font-size:12.5px;color:var(--bone-dim);margin-top:4px">${nextStage}. ${STG.blurb}</div>
+    </div>
+    <div class="statgrid">
+      <div class="stat"><div class="k">Energy</div><div class="v num">${s.stamina}</div><div class="h">≈${avgMovesPerTank(d)} moves</div></div>
+      <div class="stat"><div class="k">Balance</div><div class="v num">${Math.round(s.acc * 100)}%</div><div class="h">hit · cost ×${s.costMult}</div></div>
+      <div class="stat"><div class="k">Wisdom</div><div class="v num">${movesOf(d).length}</div><div class="h">moves known</div></div>
+      <div class="stat"><div class="k">Health</div><div class="v num">${s.hp}</div></div>
+      <div class="stat"><div class="k">Attack</div><div class="v num">${s.atk.toFixed(1)}</div></div>
+      <div class="stat"><div class="k">Listens</div><div class="v num">${Math.round((1 - ob) * 100)}%</div><div class="h">${ob > 0 ? 'may ignore you' : 'always'}</div></div>
+    </div>
+    <div>
+      <div class="eyebrow" style="margin-bottom:6px">Moves</div>
+      <div class="movelist">${movesOf(d).map(k => `<span class="chip ${MOVES[k].sig ? 'sig' : ''}" title="${esc(MOVES[k].desc)}">${MOVES[k].name} <span class="num" style="color:var(--stam)">${moveCost(d, k)}</span></span>`).join('')}
+        ${lockedMovesOf(d).slice(0, 4).map(k => `<span class="chip locked" title="Learned with more wisdom">${MOVES[k].name}</span>`).join('')}</div>
+    </div>
+    <div class="trait"><b>${br.trait}.</b> ${br.traitDesc}</div>
+    <div>
+      <div class="row" style="justify-content:space-between"><span class="eyebrow">Bond · ${bondTier(d.bond)}</span><span class="num" style="font-size:13px">${Math.round(d.bond)}/100</span></div>
+      <div class="bondbar" style="height:10px;margin-top:4px"><i style="width:${d.bond}%"></i></div>
+    </div>
+    <div class="row">
+      <button class="btn" data-act="play" ${S.care < 1 || busy ? 'disabled' : ''}>Play <span class="cost">1 care</span></button>
+      <button class="btn" data-act="feed" ${S.care < 1 || S.treats < 1 || busy ? 'disabled' : ''}>Give treat <span class="cost">1 care · 1 treat</span></button>
+      <button class="btn" data-act="train" ${S.care < 1 || S.treats < 2 || busy ? 'disabled' : ''}>Train <span class="cost">1 care · 2 treats</span></button>
+    </div>
+    <div class="row">
+      ${d.trail
+        ? `<button class="btn ${inParty ? 'danger' : 'primary'}" data-act="party" ${busy ? 'disabled' : ''}>${inParty ? 'Leave party' : 'Add to party'}</button>`
+        : `<button class="btn primary" data-act="trail" ${!best || S.care < 1 || S.treats < 3 || busy ? 'disabled' : ''}>Teach trail running <span class="cost">1 care · 3 treats</span></button>
+           <span style="font-size:12.5px;color:var(--bone-dim)">${best ? 'Ready to learn the trails with you.' : 'Must be your Best Friend (bond 80) before they’ll run the world with you.'}</span>`}
+    </div>
+    ${busy ? '<div style="font-size:12.5px;color:var(--bone-dim)">Your pack is out on an expedition. Care resumes when you return home.</div>' : ''}
+  </section>`;
+}
+
+function renderAdopt() {
+  return `<div class="screen"><section class="panel">
+    <h2>Shelter & breeders</h2>
+    <p class="sub">New dogs arrive every morning. Everyone comes home as a puppy, wary of you at first. You can also rescue lost dogs out in the wilds.</p>
+    <div class="shop">${S.shop.map((it, i) => { const b = BREEDS[it.breed]; const owned = S.seen[it.breed];
+      return `<div class="shopcard">${dogSVG(it.breed, 'puppy', 88)}
+        <h3 style="font-size:19px">${b.name}</h3>
+        <span class="badge rarity-${b.rarity}">${b.rarity}${owned ? '' : ' · new breed'}</span>
+        <div class="trait" style="text-align:left;font-size:13px"><b>${b.trait}.</b> ${b.traitDesc}</div>
+        <div style="font-size:13px;color:var(--bone-dim)">Signature as adult: <b style="color:var(--kibble)">${MOVES[b.sig].name}</b></div>
+        ${it.sold ? '<span class="badge b-party">Adopted</span>' : `<button class="btn primary" data-act="adopt" data-i="${i}" ${S.coins < PRICE[b.rarity] || S.dogs.length >= 12 ? 'disabled' : ''}>Adopt <span class="cost">${PRICE[b.rarity]} coins</span></button>`}
+      </div>`; }).join('')}</div>
+    ${S.dogs.length >= 12 ? '<p class="sub" style="margin-top:10px">Your kennel is full (12 dogs).</p>' : ''}
+  </section></div>`;
+}
+
+function renderBook() {
+  const keys = Object.keys(BREEDS), got = keys.filter(k => S.seen[k]).length;
+  return `<div class="screen"><section class="panel">
+    <h2>Breed Book</h2>
+    <p class="sub">${got} of ${keys.length} breeds collected.</p>
+    <div class="book">${keys.map(k => `<div class="bookcell ${S.seen[k] ? '' : 'missing'}">${dogSVG(k, 'adult', 64)}<div class="bn"><b>${S.seen[k] ? BREEDS[k].name : '???'}</b></div><div class="rarity-${BREEDS[k].rarity}" style="font-size:11px;text-transform:uppercase;letter-spacing:1px">${BREEDS[k].rarity}</div></div>`).join('')}</div>
+  </section></div>`;
+}
+
+function renderGuide() {
+  const row = k => { const s = STAGES[k]; return `<tr><td><b>${s.label}</b><br><span style="color:var(--bone-dim);font-size:12.5px">${k === 'puppy' ? `Days 0–${ADULT_AT - 1}` : k === 'adult' ? `Days ${ADULT_AT}–${SENIOR_AT - 1}` : `Day ${SENIOR_AT}+`}</span></td>
+    <td>${pips(s.energy)}<br><span class="num" style="font-size:12.5px">${s.stamina} stamina</span></td>
+    <td>${pips(s.balance)}<br><span class="num" style="font-size:12.5px">${Math.round(s.acc * 100)}% hit · cost ×${s.cost}</span></td>
+    <td>${pips(s.wisdom)}<br><span class="num" style="font-size:12.5px">${s.wis} moves</span></td>
+    <td style="font-size:13px">${s.blurb}</td></tr>`; };
+  return `<div class="screen guide"><section class="panel">
+    <h2>Life stages</h2>
+    <p class="sub">Every dog grows through three stages, one day at a time. Each is good at something different, so the best packs mix ages.</p>
+    <div class="tablewrap"><table class="cmp"><thead><tr><th>Stage</th><th>Energy</th><th>Balance</th><th>Wisdom</th><th>Personality</th></tr></thead><tbody>${row('puppy')}${row('adult')}${row('senior')}</tbody></table></div>
+  </section>
+  <section class="panel">
+    <h2>The three stats</h2>
+    <p><b style="color:var(--kibble)">Energy</b> is how many moves a dog can make before its stamina runs out. A tired dog can only Rest, which recovers half its stamina but costs the turn.</p>
+    <p><b style="color:var(--kibble)">Balance</b> is the chance to land an attack, plus how little stamina each move burns. Puppies flail and miss; adults hit clean and spend stamina carefully.</p>
+    <p><b style="color:var(--kibble)">Wisdom</b> is the variety of moves a dog knows. Puppies know two. Adults learn their breed’s signature move. Seniors know the whole repertoire, including Healing Lick, Pack Howl and Old Dog Trick.</p>
+    <p>Puppies also <b>don’t always listen</b>. They may chase their tail or burst into Zoomies instead of doing what you asked. More bond and more training make them more obedient.</p>
+  </section>
+  <section class="panel">
+    <h2>Becoming best friends</h2>
+    <p>You get 3 care actions a day. Play, give treats and train to raise bond. At bond 80 a dog becomes your <b>Best Friend</b> and can be taught to run the trails with you. Only trail-ready dogs can join your party of three.</p>
+    <p>Ending the day, or coming home from an expedition, heals everyone, refills care, restocks the shelter and ages every dog by one day.</p>
+  </section>
+  <section class="panel">
+    <h2>Expeditions</h2>
+    <p>Move with the arrow keys, WASD, the pad or by tapping a tile. Treats 🦴 and treasure 🎁 💎 fill your pack. Purple rifts are void monsters. Stepping onto one starts a fight. Lost dogs 🐶 join your kennel if you reach them. The swirl 🌀 leads deeper, where loot is richer and monsters hit harder. Every third level, a Rift Maw guards the way down.</p>
+    <p>Head home any time to keep what you found. If your whole pack faints, you drag them home and lose the loot you were carrying.</p>
+  </section></div>`;
+}
+
+// ============================================================
+// KENNEL ACTIONS
+// ============================================================
+function careAction(fn) { const d = dogById(ui.sel); if (!d || S.care < 1 || run) return; fn(d); S.care--; save(); render(); }
+function addBond(d, n) { const before = d.bond; d.bond = clamp(d.bond + n, 0, 100); if (before < 80 && d.bond >= 80) toast(`${d.name} is now your Best Friend!`); }
+const PLAY_LINES = ['chases a squeaky ball', 'plays tug-of-war', 'rolls over for belly rubs', 'fetches a stick (mostly)', 'zooms around the yard'];
+function endDay(reason) {
+  S.day++; S.care = 3;
+  const grew = [];
+  for (const d of S.dogs) {
+    const before = stageOf(d); d.age++;
+    const after = stageOf(d);
+    if (after !== before) grew.push(`${d.name} is now ${after === 'adult' ? 'an adult' : 'a senior'}!`);
+  }
+  rollShop();
+  save();
+  toast(grew.length ? grew.join(' ') : reason || `Day ${S.day} begins. Everyone is rested.`);
+}
+
+// ============================================================
+// WORLD / EXPEDITION
+// ============================================================
+const W = 22, H = 15, T = 32;
+function genMap(depth) {
+  const tiles = Array.from({ length: H }, () => Array(W).fill(0));
+  // obstacles: clustered trees/rocks/water
+  const blobs = 9 + depth;
+  for (let i = 0; i < blobs; i++) {
+    const cx = rint(0, W - 1), cy = rint(0, H - 1), r = rint(1, 2), t = pick([1, 1, 2, 3]);
+    for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++)
+      if (x >= 0 && y >= 0 && x < W && y < H && Math.random() < 0.7) tiles[y][x] = t;
+  }
+  for (let i = 0; i < 6 + depth * 2; i++) { const x = rint(0, W - 1), y = rint(0, H - 1); if (!tiles[y][x]) tiles[y][x] = 4; } // void cracks (walkable decor)
+  const sx = 1, sy = Math.floor(H / 2);
+  for (let y = sy - 1; y <= sy + 1; y++) for (let x = 0; x <= 2; x++) tiles[y][x] = 0;
+  // reachable cells
+  const walk = (x, y) => x >= 0 && y >= 0 && x < W && y < H && (tiles[y][x] === 0 || tiles[y][x] === 4);
+  const dist = {}, q = [[sx, sy]]; dist[sx + ',' + sy] = 0;
+  while (q.length) { const [x, y] = q.shift(); for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const nx = x + dx, ny = y + dy, k = nx + ',' + ny; if (walk(nx, ny) && dist[k] === undefined) { dist[k] = dist[x + ',' + y] + 1; q.push([nx, ny]); } } }
+  const cells = Object.keys(dist).filter(k => dist[k] > 2);
+  cells.sort((a, b) => dist[b] - dist[a]);
+  const items = {};
+  const portal = cells[0]; items[portal] = { t: 'portal' };
+  if (depth % 3 === 0) items[portal].boss = true;
+  const free = cells.slice(1).sort(() => Math.random() - 0.5);
+  const put = (t, n, extra = {}) => { for (let i = 0; i < n && free.length; i++) items[free.pop()] = { t, ...extra }; };
+  put('monster', 5 + depth);
+  put('treat', 4);
+  put('chest', 2 + Math.floor(depth / 2));
+  put('gem', 1 + Math.floor(depth / 3));
+  if (Math.random() < 0.55) put('lostdog', 1);
+  items[sx + ',' + sy] = { t: 'camp' };
+  return { tiles, items, depth, px: sx, py: sy, seen: {} };
+}
+function partyDogs() { return S.party.map(dogById).filter(Boolean); }
+function vision() { return 3 + (partyDogs().some(d => d.breed === 'beagle') ? 2 : 0); }
+function startRun() {
+  if (!S.party.length) return toast('Add at least one trail-ready dog to your party first.');
+  run = { depth: 1, map: genMap(1), loot: { coins: 0, treats: 0 }, hp: {}, found: [] };
+  for (const d of partyDogs()) run.hp[d.id] = stats(d).hp;
+  reveal(); save(); render();
+}
+function reveal() {
+  const m = run.map, v = vision();
+  for (let y = m.py - v; y <= m.py + v; y++) for (let x = m.px - v; x <= m.px + v; x++)
+    if ((x - m.px) ** 2 + (y - m.py) ** 2 <= v * v + 1) m.seen[x + ',' + y] = 1;
+}
+function step(dx, dy) {
+  if (!run || B || ui.modal) return;
+  const m = run.map, nx = m.px + dx, ny = m.py + dy;
+  if (nx < 0 || ny < 0 || nx >= W || ny >= H) return;
+  const t = m.tiles[ny][nx]; if (t !== 0 && t !== 4) return;
+  if (partyDogs().every(d => run.hp[d.id] <= 0)) return toast('Your pack is too hurt to move. Feed them treats or head home.');
+  m.px = nx; m.py = ny; reveal();
+  const k = nx + ',' + ny, it = m.items[k];
+  if (it) interact(k, it);
+  save(); render();
+}
+function interact(k, it) {
+  const m = run.map, corgi = partyDogs().some(d => d.breed === 'corgi') ? 1.3 : 1;
+  const depthMul = 1 + 0.35 * (run.depth - 1);
+  if (it.t === 'treat') { const n = rint(1, 2); run.loot.treats += n; delete m.items[k]; toast(`Found ${n} treat${n > 1 ? 's' : ''}!`); }
+  else if (it.t === 'chest') { const n = Math.round(rint(12, 24) * depthMul * corgi); run.loot.coins += n; const tr = Math.random() < 0.4 ? 1 : 0; run.loot.treats += tr; delete m.items[k]; toast(`Dug up a buried chest: ${n} coins${tr ? ' and a treat' : ''}!`); }
+  else if (it.t === 'gem') { const n = Math.round(rint(35, 55) * depthMul * corgi); run.loot.coins += n; delete m.items[k]; toast(`A void crystal worth ${n} coins!`); }
+  else if (it.t === 'lostdog') {
+    delete m.items[k];
+    if (S.dogs.length >= 12) { toast('A lost dog wags at you, but your kennel is full.'); return; }
+    const keys = Object.keys(BREEDS), rare = Math.random() < 0.25 + run.depth * 0.05;
+    const pool = keys.filter(b => rare ? BREEDS[b].rarity !== 'common' : true);
+    const dog = makeDog(pick(pool), { age: Math.random() < 0.5 ? 0 : rint(ADULT_AT, ADULT_AT + 5), bond: 30 });
+    S.dogs.push(dog); S.seen[dog.breed] = 1; run.found.push(dog.id);
+    toast(`You found a lost ${BREEDS[dog.breed].name}! ${dog.name} follows you home.`);
+  }
+  else if (it.t === 'monster') { startBattle(k, false); }
+  else if (it.t === 'portal') {
+    if (it.boss) { startBattle(k, true); return; }
+    descend();
+  }
+  else if (it.t === 'camp' && run.map.depth === run.depth && Object.keys(run.loot).some(x => run.loot[x] > 0)) {
+    ui.modal = `<h2>Back at camp</h2><p class="sub" style="margin:0">Head home with ${run.loot.coins} coins and ${run.loot.treats} treats?</p><div class="row"><button class="btn primary" data-act="gohome">Head home</button><button class="btn" data-act="closemodal">Keep exploring</button></div>`;
+  }
+}
+function descend() {
+  run.depth++; S.maxDepth = Math.max(S.maxDepth, run.depth);
+  run.map = genMap(run.depth); reveal();
+  toast(`You slip through the rift to depth ${run.depth}.${run.depth % 3 === 0 ? ' Something big waits at the far end…' : ''}`);
+}
+function goHome(lost) {
+  if (!run) return;
+  if (!lost) { S.coins += run.loot.coins; S.treats += run.loot.treats; }
+  const msg = lost ? 'Your pack limps home. The loot was lost in the void.' : `Home safe with ${run.loot.coins} coins and ${run.loot.treats} treats.`;
+  run = null; ui.modal = null; B = null; ui.tab = 'kennel';
+  endDay(msg);
+  render();
+}
+function feedInField(id) {
+  const d = dogById(id); if (!d || S.treats < 1) return toast('No treats left at home. Bring some loot back first.');
+  const max = stats(d).hp; if (run.hp[id] >= max) return;
+  S.treats--; run.hp[id] = Math.min(max, Math.max(0, run.hp[id]) + Math.round(max * 0.4)); addBond(d, 2);
+  toast(`${d.name} gobbles the treat and perks up.`); save(); render();
+}
+
+function renderWorld() {
+  if (!run) {
+    const ready = S.dogs.filter(d => d.trail);
+    return `<div class="screen"><section class="panel">
+      <h2>Plan an expedition</h2>
+      <p class="sub">Pick up to three trail-ready dogs. Mix life stages: puppies bring energy, adults bring balance, seniors bring wisdom.</p>
+      <div class="party-pick">${ready.map(d => dogCard(d, `data-act2="toggleparty"`)).join('') || '<p class="sub">No trail-ready dogs yet. Bond with a dog in your kennel until it becomes your Best Friend, then teach it to run the trails.</p>'}</div>
+      <div class="row" style="margin-top:14px"><button class="btn primary" data-act="startrun" ${S.party.length ? '' : 'disabled'}>Set out with ${S.party.length || 'no'} dog${S.party.length === 1 ? '' : 's'}</button><span class="sub" style="margin:0">Party ${S.party.length}/3 · click a dog to add or remove</span></div>
+    </section></div>`;
+  }
+  return `<div class="screen"><div class="mapwrap">
+    <section class="panel" style="padding:10px">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px;padding-inline:4px"><h2 style="font-size:20px">The Wilds · depth ${run.depth}</h2><span class="num" style="font-size:13px">Pack: ${run.loot.coins}c · ${run.loot.treats} treats</span></div>
+      <canvas id="map" width="${W * T}" height="${H * T}" aria-label="Expedition map"></canvas>
+    </section>
+    <aside class="side">
+      <section class="panel" style="display:grid;gap:10px">
+        <div class="eyebrow">Your pack</div>
+        ${partyDogs().map(d => { const max = stats(d).hp, hp = Math.max(0, run.hp[d.id]); return `<div class="mini">${dogSVG(d.breed, stageOf(d), 44)}<div class="meta"><b>${esc(d.name)} <span class="badge b-${stageOf(d)}" style="font-size:9px">${STAGES[stageOf(d)].label}</span></b><div class="bar hp"><i style="width:${hp / max * 100}%"></i></div><span class="num" style="font-size:11.5px;color:var(--bone-dim)">${hp}/${max} HP</span></div><button class="btn" style="padding:6px 9px" data-act="fieldfeed" data-id="${d.id}" ${hp >= max || S.treats < 1 ? 'disabled' : ''} title="Feed a treat: +40% health">🦴</button></div>`; }).join('')}
+        <div style="font-size:12px;color:var(--bone-dim)">Treats at home: ${S.treats}. Feeding uses them.</div>
+      </section>
+      <section class="panel" style="display:grid;gap:10px;justify-items:center">
+        <div class="dpad">
+          <span></span><button data-act="mv" data-d="0,-1" aria-label="Up">▲</button><span></span>
+          <button data-act="mv" data-d="-1,0" aria-label="Left">◀</button><span></span><button data-act="mv" data-d="1,0" aria-label="Right">▶</button>
+          <span></span><button data-act="mv" data-d="0,1" aria-label="Down">▼</button><span></span>
+        </div>
+        <button class="btn" data-act="gohomeask">Head home</button>
+      </section>
+      <section class="panel"><div class="legend"><span>⛺ Camp</span><span>🦴 Treats</span><span>🎁 Chest</span><span>💎 Crystal</span><span>🐶 Lost dog</span><span>🌀 Deeper</span><span style="color:#d29bff">● Void monster</span><span>🌲 Blocked</span></div></section>
+    </aside>
+  </div></div>`;
+}
+
+function drawMap() {
+  const c = document.getElementById('map'); if (!c) return;
+  const g = c.getContext('2d'), m = run.map, v = vision(), sniff = partyDogs().some(d => d.breed === 'beagle');
+  const tint = Math.min(1, (run.depth - 1) * 0.12);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const t = m.tiles[y][x], px = x * T, py = y * T;
+    const n = ((x * 73856093) ^ (y * 19349663) ^ (run.depth * 83492791)) & 7;
+    g.fillStyle = mix(['#3f6b3a', '#43703d', '#3b6536', '#466f3f'][n & 3], '#3a2a5a', tint); g.fillRect(px, py, T, T);
+    if (t === 1) { g.fillStyle = '#24452a'; g.beginPath(); g.arc(px + 16, py + 15, 13, 0, 7); g.fill(); g.fillStyle = '#2f5a35'; g.beginPath(); g.arc(px + 12, py + 11, 6, 0, 7); g.fill(); }
+    if (t === 2) { g.fillStyle = '#6d6a72'; g.beginPath(); g.ellipse(px + 16, py + 18, 13, 10, 0, 0, 7); g.fill(); g.fillStyle = '#8a8790'; g.beginPath(); g.ellipse(px + 12, py + 14, 5, 3, 0, 0, 7); g.fill(); }
+    if (t === 3) { g.fillStyle = mix('#2d6f9c', '#3a2a6a', tint); g.fillRect(px, py, T, T); g.strokeStyle = 'rgba(255,255,255,.18)'; g.beginPath(); g.moveTo(px + 6, py + 12 + (n & 3)); g.lineTo(px + 16, py + 12 + (n & 3)); g.stroke(); }
+    if (t === 4) { g.strokeStyle = 'rgba(176,76,255,.65)'; g.lineWidth = 2; g.beginPath(); g.moveTo(px + 6, py + 8); g.lineTo(px + 14, py + 18); g.lineTo(px + 11, py + 24); g.lineTo(px + 22, py + 28); g.stroke(); g.lineWidth = 1; }
+  }
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '20px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+  const icons = { treat: '🦴', chest: '🎁', gem: '💎', lostdog: '🐶', portal: '🌀', camp: '⛺' };
+  const now = performance.now() / 600;
+  for (const k in m.items) {
+    const [x, y] = k.split(',').map(Number), it = m.items[k];
+    const visible = m.seen[k] || (sniff && it.t === 'chest');
+    if (!visible) continue;
+    const cx = x * T + 16, cy = y * T + 16;
+    if (it.t === 'monster' || it.boss) {
+      const r = it.boss ? 14 : 10 + Math.sin(now + x) * 1.5;
+      const grd = g.createRadialGradient(cx, cy, 2, cx, cy, r + 6); grd.addColorStop(0, '#b04cff'); grd.addColorStop(1, 'rgba(176,76,255,0)');
+      g.fillStyle = grd; g.beginPath(); g.arc(cx, cy, r + 6, 0, 7); g.fill();
+      g.fillStyle = '#1c0b33'; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill();
+      g.fillStyle = '#e9c6ff'; g.beginPath(); g.arc(cx - 4, cy - 2, 2.2, 0, 7); g.arc(cx + 4, cy - 2, 2.2, 0, 7); g.fill();
+      if (it.t === 'portal') { g.globalAlpha = .5; g.fillText('🌀', cx, cy + 1); g.globalAlpha = 1; }
+    } else g.fillText(icons[it.t], cx, cy + 1);
+  }
+  // fog
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const k = x + ',' + y, inView = (x - m.px) ** 2 + (y - m.py) ** 2 <= v * v + 1;
+    if (!m.seen[k]) { g.fillStyle = '#0a0812'; g.fillRect(x * T, y * T, T, T); }
+    else if (!inView) { g.fillStyle = 'rgba(10,8,18,.5)'; g.fillRect(x * T, y * T, T, T); }
+  }
+  // sniffed chests show through fog
+  if (sniff) for (const k in m.items) if (m.items[k].t === 'chest' && !m.seen[k]) { const [x, y] = k.split(',').map(Number); g.globalAlpha = .55; g.fillText('🎁', x * T + 16, y * T + 17); g.globalAlpha = 1; }
+  // player: lead dog head
+  const lead = partyDogs()[0];
+  if (lead) {
+    const b = BREEDS[lead.breed], cx = m.px * T + 16, cy = m.py * T + 16;
+    g.fillStyle = 'rgba(242,165,65,.35)'; g.beginPath(); g.arc(cx, cy, 15, 0, 7); g.fill();
+    g.fillStyle = b.ear; g.beginPath(); g.arc(cx - 9, cy - 6, 5, 0, 7); g.arc(cx + 9, cy - 6, 5, 0, 7); g.fill();
+    g.fillStyle = b.coat; g.beginPath(); g.arc(cx, cy, 10, 0, 7); g.fill();
+    g.fillStyle = b.muzzle; g.beginPath(); g.ellipse(cx, cy + 4, 5.5, 4, 0, 0, 7); g.fill();
+    g.fillStyle = '#1a1412'; g.beginPath(); g.arc(cx - 4, cy - 2, 1.6, 0, 7); g.arc(cx + 4, cy - 2, 1.6, 0, 7); g.arc(cx, cy + 2.5, 2, 0, 7); g.fill();
+  }
+}
+// animate monster pulse while on the map
+(function loop() { if (S && S.started && ui.tab === 'world' && run && !B) drawMap(); requestAnimationFrame(loop); })();
+
+// ============================================================
+// BATTLE
+// ============================================================
+function spawnGroup(depth, boss) {
+  const scale = 1 + 0.18 * (depth - 1);
+  const mk = key => { const m = MONSTERS[key]; const hp = Math.round(m.hp * scale); return { key, name: m.name, hp, max: hp, atk: m.atk * scale, def: m.def * scale, xp: Math.round(m.xp * scale), weak: 0, mark: 0, stun: 0, boss: !!m.boss, turn: 0 }; };
+  if (boss) return [mk('maw'), mk(pick(['wisp', 'crow']))];
+  const pool = depth === 1 ? ['wisp', 'shade', 'crow'] : ['wisp', 'shade', 'crow', 'crawler'];
+  const n = rint(1, Math.max(1, Math.min(3, S.party.length, 1 + Math.ceil(depth / 2))));
+  return Array.from({ length: n }, () => mk(pick(pool)));
+}
+function startBattle(tileKey, boss) {
+  const dogs = partyDogs().map(d => { const s = stats(d); return { id: d.id, d, hp: Math.max(0, run.hp[d.id]), max: s.hp, st: s.stamina, maxst: s.stamina, s, guard: false, taunt: false, acted: false }; });
+  B = { tile: tileKey, boss, foes: spawnGroup(run.depth, boss), dogs, log: [], target: 0, buff: 0, phase: 'player', round: 1, coins: 0, fx: {} };
+  B.log.push(['void', boss ? 'The ground splits open. A Rift Maw rises from the void!' : `Void monsters ooze out of the rift: ${B.foes.map(f => f.name).join(', ')}.`]);
+  nextActor(); render();
+}
+const aliveDogs = () => B.dogs.filter(x => x.hp > 0);
+const aliveFoes = () => B.foes.filter(f => f.hp > 0);
+function actor() { return B.dogs.find(x => x.hp > 0 && !x.acted); }
+function nextActor() {
+  if (!aliveFoes().length) return winBattle();
+  if (!aliveDogs().length) return loseBattle();
+  if (!actor()) { B.phase = 'enemy'; render(); setTimeout(enemyPhase, 550); return; }
+  if (!B.foes[B.target] || B.foes[B.target].hp <= 0) B.target = B.foes.findIndex(f => f.hp > 0);
+}
+function log(cls, msg) { B.log.push([cls, msg]); if (B.log.length > 60) B.log.shift(); }
+function fx(key, cls) { B.fx[key] = cls; }
+
+function dmgToFoe(a, f, pow) {
+  const mult = (B.buff > 0 ? 1.3 : 1) * (f.mark > 0 ? 1.5 : 1);
+  return Math.max(1, Math.round(a.s.atk * pow * mult * rnd(0.85, 1.15) - f.def * 0.5));
+}
+function hitFoe(a, f, pow, sure) {
+  if (!sure && Math.random() > a.s.acc) { log('miss', `${a.d.name} lunges at ${f.name} and misses.`); return false; }
+  const n = dmgToFoe(a, f, pow); f.hp = Math.max(0, f.hp - n); fx('f' + B.foes.indexOf(f), 'shake');
+  log('', `${a.d.name} hits ${f.name} for ${n}.${f.hp <= 0 ? ` ${f.name} dissolves into the void!` : ''}`);
+  return true;
+}
+function healAmt(a, pct, target) { return Math.round(target.max * pct * (a.d.breed === 'golden' ? 1.25 : 1)); }
+
+function useMove(key, forcedTarget) {
+  const a = actor(); if (!a || B.phase !== 'player') return;
+  const cost = moveCost(a.d, key);
+  if (cost > a.st) return;
+  let m = MOVES[key];
+  // Puppies (and occasionally young adults) don't always listen
+  const dis = disobeyChance(a.d);
+  if (key !== 'rest' && Math.random() < dis) {
+    const roll = Math.random(), known = movesOf(a.d).filter(k => moveCost(a.d, k) <= a.st);
+    if (roll < 0.4) { a.st = Math.max(0, a.st - 1); log('pup', `${a.d.name} ignores you and chases its own tail.`); a.acted = true; fx('d' + a.id, 'shake'); nextActor(); render(); return; }
+    if (roll < 0.55) { log('pup', `${a.d.name} sniffs something interesting and forgets the fight.`); a.acted = true; nextActor(); render(); return; }
+    const alt = known.includes('zoomies') ? 'zoomies' : pick(known);
+    if (alt && alt !== key) { log('pup', `${a.d.name} doesn’t listen and does ${MOVES[alt].name} instead!`); key = alt; m = MOVES[key]; }
+  }
+  a.st -= moveCost(a.d, key);
+  const foes = aliveFoes(); let tgt = forcedTarget ?? B.foes[B.target];
+  if (!tgt || tgt.hp <= 0) tgt = foes[0];
+  const allies = aliveDogs();
+  switch (m.kind) {
+    case 'dmg': if (hitFoe(a, tgt, m.pow, m.sure) && m.coins) { const c = Math.round(m.coins * (1 + 0.3 * (run.depth - 1))); B.coins += c; log('good', `Coins bounce loose: +${c}.`); } break;
+    case 'multi': { const hits = rint(m.hits[0], m.hits[1]); log('', `${a.d.name} uses ${m.name}!`); for (let i = 0; i < hits; i++) { const live = aliveFoes(); if (!live.length) break; hitFoe(a, key === 'zoomies' ? pick(live) : (tgt.hp > 0 ? tgt : live[0]), m.pow, false); } break; }
+    case 'aoe': log('', `${a.d.name} lets out a ${m.name}!`); for (const f of foes) hitFoe(a, f, m.pow, false); break;
+    case 'stun': if (hitFoe(a, tgt, m.pow, false) && tgt.hp > 0 && Math.random() < m.chance) { tgt.stun = 1; log('good', `${tgt.name} is herded into a corner and loses its turn.`); } break;
+    case 'mark': if (Math.random() <= a.s.acc + 0.1) { tgt.mark = 3; log('good', `${a.d.name} locks onto ${tgt.name}'s scent. It takes 50% more damage.`); } else log('miss', `${a.d.name} loses the scent.`); break;
+    case 'guard': a.guard = true; a.taunt = true; log('', `${a.d.name} plants its paws and guards.`); break;
+    case 'dmgGuard': hitFoe(a, tgt, m.pow, false); a.guard = true; a.taunt = true; log('', `${a.d.name} digs in.`); break;
+    case 'guardAll': allies.forEach(x => x.guard = true); log('good', `${a.d.name} forms a Shield Wall. The pack braces together.`); break;
+    case 'tauntHeal': { a.taunt = true; a.guard = true; const h = healAmt(a, m.amt, a); a.hp = Math.min(a.max, a.hp + h); log('good', `${a.d.name} stands tall, drawing every eye, and recovers ${h}.`); break; }
+    case 'weakenAll': foes.forEach(f => { f.weak = 2; if (m.stunChance && Math.random() < m.stunChance) { f.stun = 1; } }); log('good', `${a.d.name}'s ${m.name} rattles the monsters. They deal less damage.${m.stunChance ? ' Some are stunned!' : ''}`); break;
+    case 'heal': { const t = allies.slice().sort((x, y) => x.hp / x.max - y.hp / y.max)[0]; const h = healAmt(a, m.amt, t); t.hp = Math.min(t.max, t.hp + h); fx('d' + t.id, 'flash'); log('good', `${a.d.name} licks ${t.d.name}'s wounds: +${h}.`); break; }
+    case 'healAll': allies.forEach(t => { const h = healAmt(a, m.amt, t); t.hp = Math.min(t.max, t.hp + h); fx('d' + t.id, 'flash'); }); log('good', `${a.d.name}'s ${m.name} warms the whole pack.`); break;
+    case 'buffAll': B.buff = 3; log('good', `${a.d.name} howls. The pack's blood is up: +30% damage for 3 rounds.`); break;
+    case 'stamAll': allies.filter(x => x !== a).forEach(x => x.st = Math.min(x.maxst, x.st + m.amt)); log('good', `${a.d.name} shows the young ones how to pace themselves. +${m.amt} stamina to the pack.`); break;
+    case 'rest': { const r = Math.max(3, Math.ceil(a.maxst / 2)); a.st = Math.min(a.maxst, a.st + r); log('', `${a.d.name} pants and catches its breath (+${r} stamina).`); break; }
+    case 'revive': { const down = B.dogs.filter(x => x.hp <= 0); if (!down.length) { log('miss', 'Nobody needs rescuing.'); a.st += moveCost(a.d, key); return render(); } const t = down[0]; t.hp = Math.round(t.max * m.amt); t.acted = true; fx('d' + t.id, 'flash'); log('good', `${a.d.name} brings the rescue barrel. ${t.d.name} is back on its paws!`); break; }
+  }
+  a.acted = true;
+  nextActor(); render();
+}
+function enemyPhase() {
+  if (!B) return;
+  const foes = aliveFoes();
+  let i = 0;
+  const actOne = () => {
+    if (!B) return;
+    if (!aliveDogs().length) return loseBattle();
+    if (i >= foes.length) return newRound();
+    const f = foes[i++];
+    if (f.hp <= 0) return actOne();
+    if (f.stun > 0) { f.stun--; log('miss', `${f.name} is dazed and does nothing.`); render(); return setTimeout(actOne, 380); }
+    monsterAct(f); render();
+    setTimeout(actOne, 480);
+  };
+  actOne();
+}
+function chooseTarget() {
+  const live = aliveDogs(), taunt = live.filter(x => x.taunt);
+  return taunt.length ? pick(taunt) : pick(live);
+}
+function hurtDog(t, f, mult, verb) {
+  if (t.d.breed === 'greyhound' && Math.random() < 0.15) { log('good', `${t.d.name} sidesteps the ${f.name}!`); return; }
+  let n = f.atk * mult * rnd(0.85, 1.15) * (f.weak > 0 ? 0.7 : 1) - t.s.def * 0.5;
+  if (t.guard) n *= 0.5;
+  if (t.d.breed === 'dachshund' && t.hp < t.max / 2) n *= 0.75;
+  n = Math.max(1, Math.round(n));
+  t.hp = Math.max(0, t.hp - n); fx('d' + t.id, 'shake');
+  log('bad', `${f.name} ${verb} ${t.d.name} for ${n}.${t.hp <= 0 ? ` ${t.d.name} faints!` : ''}`);
+}
+function drain(t, n, f) {
+  if (t.hp <= 0) return;
+  if (t.d.breed === 'shiba') { log('good', `${t.d.name} is completely unbothered by the void.`); return; }
+  t.st = Math.max(0, t.st - n); log('void', `${f.name} siphons ${n} stamina from ${t.d.name}.`);
+}
+function monsterAct(f) {
+  const ab = MONSTERS[f.key].abil; f.turn++;
+  if (ab === 'boss') {
+    if (f.turn % 3 === 0) { log('void', `${f.name} unleashes a Void Roar!`); aliveDogs().forEach(t => { hurtDog(t, f, 0.6, 'blasts'); drain(t, 2, f); }); }
+    else hurtDog(chooseTarget(), f, f.turn % 3 === 2 ? 1.5 : 1, f.turn % 3 === 2 ? 'tries to devour' : 'slams');
+  } else if (ab === 'drain') { const t = chooseTarget(); hurtDog(t, f, 0.6, 'brushes'); drain(t, 3, f); }
+  else if (ab === 'swoop') { const live = aliveDogs().slice().sort(() => Math.random() - 0.5).slice(0, 2); log('void', `${f.name} swoops low!`); live.forEach(t => hurtDog(t, f, 0.7, 'claws')); }
+  else if (ab === 'slam') { hurtDog(chooseTarget(), f, Math.random() < 0.5 ? 1.3 : 0.9, 'crushes'); }
+  else hurtDog(chooseTarget(), f, 1, 'bites');
+  if (f.weak > 0) f.weak--;
+}
+function newRound() {
+  if (!B) return;
+  if (!aliveDogs().length) return loseBattle();
+  B.round++; B.phase = 'player';
+  B.dogs.forEach(x => { x.acted = false; x.guard = false; x.taunt = false; });
+  B.foes.forEach(f => { if (f.mark > 0) f.mark--; });
+  if (B.buff > 0) B.buff--;
+  nextActor(); render();
+}
+function winBattle() {
+  B.phase = 'done';
+  const xp = B.foes.reduce((a, f) => a + f.xp, 0);
+  const corgi = partyDogs().some(d => d.breed === 'corgi') ? 1.3 : 1;
+  const coins = Math.round((B.foes.reduce((a, f) => a + (f.boss ? 80 : 6), 0) * (1 + 0.3 * (run.depth - 1))) * corgi) + B.coins;
+  let treats = Math.random() < 0.45 ? 1 : 0;
+  if (B.dogs.some(x => x.d.breed === 'bernese')) treats++;
+  run.loot.coins += coins; run.loot.treats += treats;
+  const ups = [];
+  for (const x of B.dogs) {
+    run.hp[x.id] = Math.max(1, x.hp); // fainted dogs get back up, barely
+    const lv = giveXP(x.d, xp); addBond(x.d, 2);
+    if (lv.length) { ups.push(`${x.d.name} reached level ${x.d.lvl}!`); run.hp[x.id] = Math.min(stats(x.d).hp, run.hp[x.id] + 8); }
+  }
+  S.wins++;
+  const m = run.map, it = m.items[B.tile];
+  const wasBoss = B.boss;
+  delete m.items[B.tile];
+  if (wasBoss) m.items[B.tile] = { t: 'portal' };
+  ui.modal = `<h2>${wasBoss ? 'The Rift Maw is sealed!' : 'Victory!'}</h2>
+    <p class="sub" style="margin:0">+${xp} XP each · +${coins} coins${treats ? ` · +${treats} treat${treats > 1 ? 's' : ''}` : ''} · +2 bond</p>
+    ${ups.length ? `<p style="margin:0;color:var(--heal)">${ups.join(' ')}</p>` : ''}
+    <div class="row"><button class="btn primary" data-act="closebattle">${wasBoss ? 'Continue' : 'Keep exploring'}</button></div>`;
+  save(); render();
+}
+function loseBattle() {
+  if (!B || B.phase === 'lost') return;
+  B.phase = 'lost';
+  ui.modal = `<h2>Your pack is overwhelmed</h2><p class="sub" style="margin:0">Everyone fainted. You scoop them up and run for home, but the ${run.loot.coins} coins and ${run.loot.treats} treats you were carrying are swallowed by the void.</p><div class="row"><button class="btn primary" data-act="losthome">Limp home</button></div>`;
+  render();
+}
+function fleeBattle() {
+  if (!B || B.phase !== 'player') return;
+  if (B.boss) return toast('The Rift Maw blocks your escape!');
+  const lost = Math.round(run.loot.coins * 0.25);
+  run.loot.coins -= lost;
+  B.dogs.forEach(x => run.hp[x.id] = Math.max(0, x.hp));
+  // step back off the monster tile
+  const m = run.map; const [tx, ty] = B.tile.split(',').map(Number);
+  for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) { const nx = tx + dx, ny = ty + dy; if (nx >= 0 && ny >= 0 && nx < W && ny < H && [0, 4].includes(m.tiles[ny][nx]) && !m.items[nx + ',' + ny]) { m.px = nx; m.py = ny; break; } }
+  B = null; toast(lost ? `You escape, dropping ${lost} coins.` : 'You escape!'); save(); render();
+}
+
+function renderBattle() {
+  const a = B.phase === 'player' ? actor() : null;
+  const fxc = k => B.fx[k] || '';
+  const dogRow = x => { const st = stageOf(x.d); const ob = disobeyChance(x.d);
+    return `<div class="fighter ${x.hp <= 0 ? 'down' : ''} ${a === x ? 'active' : ''} ${fxc('d' + x.id)}">
+      ${dogSVG(x.d.breed, st, 54)}
+      <div class="meta">
+        <div class="nm"><span>${esc(x.d.name)} <span class="badge b-${st}" style="font-size:9px">${STAGES[st].label}</span></span><span class="num" style="font-weight:500;color:var(--bone-dim)">${x.hp}/${x.max}</span></div>
+        <div class="bar hp"><i style="width:${x.hp / x.max * 100}%"></i></div>
+        <div class="bar st" title="Stamina"><i style="width:${x.st / x.maxst * 100}%"></i></div>
+        <div class="tags"><span class="tag num">Stamina ${x.st}/${x.maxst}</span><span class="tag num">Hit ${Math.round(x.s.acc * 100)}%</span>${ob > 0 ? `<span class="tag">Listens ${Math.round((1 - ob) * 100)}%</span>` : ''}${x.guard ? '<span class="tag" style="color:var(--stam)">Guarding</span>' : ''}${x.acted && x.hp > 0 ? '<span class="tag">Done</span>' : ''}</div>
+      </div></div>`; };
+  const foeRow = (f, i) => `<div class="fighter targetable ${f.hp <= 0 ? 'down' : ''} ${B.target === i && f.hp > 0 ? 'targeted' : ''} ${fxc('f' + i)}" data-act="target" data-i="${i}" role="button" tabindex="0" aria-label="Target ${f.name}">
+      ${monSVG(MONSTERS[f.key].shape, f.boss ? 70 : 54)}
+      <div class="meta">
+        <div class="nm"><span style="color:#d29bff">${f.name}</span><span class="num" style="font-weight:500;color:var(--bone-dim)">${f.hp}/${f.max}</span></div>
+        <div class="bar ehp"><i style="width:${f.hp / f.max * 100}%"></i></div>
+        <div class="tags">${f.weak > 0 ? '<span class="tag">Weakened</span>' : ''}${f.mark > 0 ? '<span class="tag" style="color:var(--kibble)">Scent-locked</span>' : ''}${f.stun > 0 ? '<span class="tag">Stunned</span>' : ''}${B.target === i && f.hp > 0 ? '<span class="tag" style="color:#d29bff">Target</span>' : ''}</div>
+      </div></div>`;
+  let controls = '';
+  if (a) {
+    const ks = movesOf(a.d);
+    controls = `<div class="panel" style="display:grid;gap:10px">
+      <div class="row" style="justify-content:space-between"><div><span class="eyebrow">Round ${B.round}${B.buff > 0 ? ' · Pack Howl active' : ''}</span><h3 style="font-size:20px">What should ${esc(a.d.name)} do?</h3></div><button class="btn" data-act="flee" ${B.boss ? 'disabled' : ''}>Run away</button></div>
+      <div class="moves">${ks.map((k, i) => { const m = MOVES[k], c = moveCost(a.d, k); return `<button class="move ${m.sig ? 'sig' : ''}" data-act="move" data-k="${k}" ${c > a.st ? 'disabled' : ''}><span class="t"><span>${i + 1}. ${m.name}</span><span class="cost">${c} st</span></span><span class="d">${m.desc}</span></button>`; }).join('')}
+        <button class="move" data-act="move" data-k="rest"><span class="t"><span>R. Rest</span><span class="cost">+${Math.max(3, Math.ceil(a.maxst / 2))} st</span></span><span class="d">${MOVES.rest.desc}</span></button></div>
+      ${a.st < Math.min(...ks.map(k => moveCost(a.d, k))) ? `<div style="color:var(--stam);font-size:13px">${esc(a.d.name)} is out of stamina and has to rest.</div>` : ''}
+    </div>`;
+  } else if (B.phase === 'enemy') controls = `<div class="panel"><span class="eyebrow">The void moves…</span></div>`;
+  B.fx = {};
+  return `<div class="battle" role="dialog" aria-label="Battle"><div class="wrap">
+    <div class="row" style="justify-content:space-between"><h2 style="font-size:24px;color:${B.boss ? '#d29bff' : 'var(--bone)'}">${B.boss ? 'Boss: Rift Maw' : 'Void encounter'}</h2><span class="sub" style="margin:0">Depth ${run.depth} · tap a monster to target it</span></div>
+    <div class="arena"><div class="side-col">${B.dogs.map(dogRow).join('')}</div><div class="side-col">${B.foes.map(foeRow).join('')}</div></div>
+    ${controls}
+    <div class="blog" aria-live="polite">${B.log.map(([c, t]) => `<div class="${c}">${esc(t)}</div>`).join('')}</div>
+  </div></div>`;
+}
+
+// ============================================================
+// EVENTS
+// ============================================================
+function bind() {
+  document.querySelectorAll('[data-act]').forEach(el => {
+    const act = el.dataset.act;
+    el.onclick = ev => handle(act, el, ev);
+    if (el.getAttribute('role') === 'button') el.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); handle(act, el, ev); } };
+  });
+  const c = document.getElementById('map');
+  if (c) c.onclick = ev => {
+    const r = c.getBoundingClientRect(), x = Math.floor((ev.clientX - r.left) / r.width * W), y = Math.floor((ev.clientY - r.top) / r.height * H);
+    const dx = x - run.map.px, dy = y - run.map.py;
+    if (!dx && !dy) return;
+    Math.abs(dx) >= Math.abs(dy) ? step(Math.sign(dx), 0) : step(0, Math.sign(dy));
+  };
+}
+function handle(act, el) {
+  const d = dogById(ui.sel);
+  switch (act) {
+    case 'start': {
+      const k = el.dataset.k;
+      const dog = makeDog(k, { age: ADULT_AT + 1, bond: 85, trail: true, lvl: 2 });
+      S.dogs.push(dog); S.party = [dog.id]; S.seen[k] = 1; S.started = true; ui.sel = dog.id; rollShop();
+      save(); toast(`${dog.name} the ${BREEDS[k].name} wags at you. Adopt more dogs to build your pack!`); render(); break;
+    }
+    case 'tab': ui.tab = el.dataset.k; render(); break;
+    case 'sel':
+      if (el.dataset.act2 === 'toggleparty') { toggleParty(+el.dataset.id); break; }
+      ui.sel = +el.dataset.id; render(); break;
+    case 'play': careAction(x => { addBond(x, rint(8, 11)); if (!ui.toast) toast(`${x.name} ${pick(PLAY_LINES)}. Bond up!`); }); break;
+    case 'feed': careAction(x => { S.treats--; addBond(x, rint(13, 16)); if (!ui.toast) toast(`${x.name} munches happily. Bond up!`); }); break;
+    case 'train': careAction(x => { S.treats -= 2; x.trainings++; addBond(x, 5); const up = giveXP(x, 18); if (!ui.toast) toast(`${x.name} practices sit, stay and come.${up.length ? ` Level ${x.lvl}!` : ''}${stageOf(x) === 'puppy' ? ' It listens a little better now.' : ''}`); }); break;
+    case 'trail': careAction(x => { S.treats -= 3; x.trail = true; toast(`${x.name} learned to run the trails with you! Add them to your party.`); }); break;
+    case 'party': if (d) toggleParty(d.id); break;
+    case 'endday': endDay(); render(); break;
+    case 'adopt': {
+      const it = S.shop[+el.dataset.i], price = PRICE[BREEDS[it.breed].rarity];
+      if (it.sold || S.coins < price || S.dogs.length >= 12) break;
+      S.coins -= price; it.sold = true; const dog = makeDog(it.breed); S.dogs.push(dog); const isNew = !S.seen[it.breed]; S.seen[it.breed] = 1; ui.sel = dog.id;
+      save(); toast(`Welcome home, ${dog.name}!${isNew ? ' New breed added to your Breed Book.' : ''}`); render(); break;
+    }
+    case 'startrun': startRun(); break;
+    case 'mv': { const [dx, dy] = el.dataset.d.split(',').map(Number); step(dx, dy); break; }
+    case 'fieldfeed': feedInField(+el.dataset.id); break;
+    case 'gohomeask': ui.modal = `<h2>Head home?</h2><p class="sub" style="margin:0">You’ll bank ${run.loot.coins} coins and ${run.loot.treats} treats, and the day will end.</p><div class="row"><button class="btn primary" data-act="gohome">Head home</button><button class="btn" data-act="closemodal">Keep exploring</button></div>`; render(); break;
+    case 'gohome': goHome(false); break;
+    case 'losthome': goHome(true); break;
+    case 'closemodal': ui.modal = null; render(); break;
+    case 'closebattle': {
+      const wasBoss = B && B.boss; B = null; ui.modal = null;
+      if (wasBoss) descend();
+      save(); render(); break;
+    }
+    case 'target': if (B) { const i = +el.dataset.i; if (B.foes[i].hp > 0) { B.target = i; render(); } } break;
+    case 'move': useMove(el.dataset.k); break;
+    case 'flee': fleeBattle(); break;
+    case 'reset': try { localStorage.removeItem(SAVE_KEY); } catch (e) {} S = newState(); run = null; B = null; ui = { tab: 'kennel', sel: null, toast: null, modal: null }; render(); break;
+  }
+}
+function toggleParty(id) {
+  const d = dogById(id); if (!d || run) return;
+  if (S.party.includes(id)) S.party = S.party.filter(x => x !== id);
+  else if (!d.trail) return toast(`${d.name} isn't trail-trained yet.`);
+  else if (S.party.length >= 3) return toast('A party can only have 3 dogs.');
+  else S.party.push(id);
+  save(); render();
+}
+document.addEventListener('keydown', e => {
+  if (!S || !S.started) return;
+  if (B && B.phase === 'player' && !ui.modal) {
+    const a = actor(); if (!a) return;
+    const ks = movesOf(a.d), n = parseInt(e.key, 10);
+    if (n >= 1 && n <= ks.length) { useMove(ks[n - 1]); e.preventDefault(); }
+    else if (e.key === 'r' || e.key === 'R') { useMove('rest'); e.preventDefault(); }
+    else if (e.key === 'Tab') { const live = B.foes.map((f, i) => f.hp > 0 ? i : -1).filter(i => i >= 0); B.target = live[(live.indexOf(B.target) + 1) % live.length]; render(); e.preventDefault(); }
+    return;
+  }
+  if (ui.tab !== 'world' || !run || B || ui.modal) return;
+  const k = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0] }[e.key];
+  if (k) { step(...k); e.preventDefault(); }
+});
+
+// ============================================================
+// BOOT
+// ============================================================
+function start(hot) {
+  S = (hot && hot.S) || load() || newState();
+  run = S.run || null;
+  if (run && !run.map) run = null;
+  if (S.started && !S.shop.length) rollShop();
+  render();
+}
+window.claude?.hot?.snapshot?.(() => ({ S: Object.assign({}, S, { run }) }));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
+</body>
+</html>
