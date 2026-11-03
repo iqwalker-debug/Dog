@@ -8,8 +8,17 @@
 ## Current state
 - `src/painterly.js` — rendering foundation (paint filter, paper grain, glints, riverbed caustics, dynamic resolution). Extend, don't replace.
 - `src/main.js` — Level 1 prototype (swimming hole, graffiti wall, dam, oaks, ripples, 2 AI dogs)
-- `src/dog.js` — placeholder primitive dog. Replace with rigged GLB + shell fur.
-- `reference/` — Ian's 8 target paintings. Compare screenshots against these.
+- `src/dog.js` + `src/fur.js` — DONE (step 2): shell fur (24/12/6 LOD), wet-fur clumping/darkening, ear springs, swim paddle, walk/trot/run (Shift), climb out onto the beach, auto shake-off with droplets (E to shake). Bodies are still primitive shapes; next upgrade is rigged GLB dogs using the same fur.js shells.
+- `reference/` — Ian's 16 target paintings. Compare screenshots against these.
+  - 1–8: swimming hole, greenbelt creek, off-leash park, Violet Crown Trail arch
+  - 9: French bulldog (fawn, black mask, blue harness) + red doodle lounging on granite boulders
+  - 10: golden retriever (eyes closed, tongue out) + red doodle in sunflower bandana on creek rocks
+  - 11: walker with 5 leashed dogs on a shaded trail (husky, black/white bernedoodle, red golden, cream golden, doodle)
+  - 12: dogs crossing a dry limestone creek bed under a layered limestone bluff
+  - 13: wet red golden retriever on limestone ledges (target for wet-fur look)
+  - 14: POV of walking 4 leashed dogs up a rocky trail toward a walker
+  - 15: hill-country creek landscape: oak canopy, prickly pear, black-eyed susans, limestone slabs
+  - 16: black lab, white doodle, red doodle wading shallow golden-bottom river with sun sparkle
 - Note: UnrealBloomPass rendered black in testing; glints in the paint pass replace it.
 
 ## Brief
@@ -32,7 +41,11 @@ ART DIRECTION (non-negotiable)
 
 DOGS (the hero)
 - Breeds: golden doodle (curly), husky (black/white, plume tail), black lab,
-  Australian shepherd (merle, heterochromia), shih-tzu mix, golden retriever.
+  Australian shepherd (merle, heterochromia), shih-tzu mix, golden retriever,
+  red golden, cream golden, French bulldog (fawn, black mask, bat ears),
+  black/white bernedoodle, white doodle, black/white border collie mix.
+- Gear: colored harnesses (blue, black, red, purple), bandanas, leashes in mint/orange/red/black.
+- Poses: lounging on rocks, sitting with eyes closed, wading, sniffing.
 - Fur via shell texturing (24–32 shells, noise-driven strand mask, curl for
   doodles) + fin silhouettes. Wet-fur state darkens and clumps fur when swimming.
 - Animation: walk, trot, run, swim (head above water, paddle), shake-off,
@@ -45,6 +58,10 @@ LEVELS (stylized, not photoreal replicas)
 2. Wide shallow greenbelt creek, rocky banks, people wading, skyline far away.
 3. Fenced off-leash park, grass with tiny white wildflowers.
 4. Rusty steel arch trailhead with wildflower meadow and crushed-granite path.
+5. Shaded oak trail with dappled light: pack walk with 4–5 leashed dogs (POV + 3rd person).
+6. Dry limestone creek bed under a layered limestone bluff; boulder hopping.
+7. Hill-country creek: oak canopy, prickly pear, black-eyed susans, limestone stepping slabs.
+8. Shallow golden-bottom river wading with heavy sun sparkle.
 
 PERFORMANCE TARGET: 3840x2160 @ 60fps on a desktop GPU (RTX 3070 / M2 Pro+)
 - Keep the dynamic-resolution loop in painterly.js (internal 0.5–1.0 scale);
@@ -56,7 +73,7 @@ PERFORMANCE TARGET: 3840x2160 @ 60fps on a desktop GPU (RTX 3070 / M2 Pro+)
 
 DELIVER IN ORDER, running after each step:
 1. Level 1 graybox + painterly pipeline + water + caustics, one husky swimming.
-2. Fur shells + swim/shake animations.
+2. ~~Fur shells + swim/shake animations.~~ DONE
 3. Remaining dogs, then levels 2–4.
 4. Gameplay loop: fetch, swim races, collecting sticks/treats, walk routes.
 After each step, screenshot at 3840x2160 with Playwright and compare against

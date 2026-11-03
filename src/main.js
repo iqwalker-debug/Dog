@@ -185,7 +185,11 @@ const trunkMat = new THREE.MeshStandardMaterial({ color: '#5a4630', roughness: 1
 const leafGeo = new THREE.IcosahedronGeometry(3, 1);
 const leafMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9, vertexColors: false });
 const treeSpots = [];
-for (let i = 0; i < 26; i++) treeSpots.push([26 + Math.random() * 20, -30 + Math.random() * 60]);
+for (let i = 0; i < 26; i++) {
+  const x = 26 + Math.random() * 22, z = -30 + Math.random() * 60;
+  if (x < 44 && z > -8 && z < 18) continue; // keep a sunny landing beach clear for the dogs
+  treeSpots.push([x, z]);
+}
 for (let i = 0; i < 18; i++) treeSpots.push([-60 + Math.random() * 100, -34 - Math.random() * 14]);
 const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, treeSpots.length);
 const leaves = new THREE.InstancedMesh(leafGeo, leafMat, treeSpots.length * 6);
@@ -208,14 +212,14 @@ scene.add(trunks, leaves);
 // ---------- Dog ----------
 const dog = createDog({ coat: '#1c1d22', belly: '#f2efe8' });
 dog.group.position.set(-6, 0, 14);
-scene.add(dog.group);
+scene.add(dog.group, dog.drops);
 
 // a couple of AI swimmers (doodle + lab) for life
 const buddies = [
   createDog({ coat: '#b8733a', belly: '#c98a4f', curly: true }),
   createDog({ coat: '#141414', belly: '#1e1e1e' }),
 ];
-buddies.forEach((b, i) => { b.group.position.set(-10 + i * 12, 0, -4 - i * 6); b.phase = i * 2; scene.add(b.group); });
+buddies.forEach((b, i) => { b.group.position.set(-10 + i * 12, 0, -4 - i * 6); b.phase = i * 2; scene.add(b.group, b.drops); });
 
 // ---------- Ripples ----------
 const ripples = [];
@@ -231,7 +235,8 @@ const keys = {};
 addEventListener('keydown', (e) => {
   keys[e.code] = true;
   if (e.code === 'F3') { e.preventDefault(); hud.style.display = hud.style.display === 'block' ? 'none' : 'block'; }
-  if (e.code === 'Space') { for (let i = 0; i < 3; i++) spawnRipple(dog.group.position.x, dog.group.position.z, 1.6); dog.splash(); }
+  if (e.code === 'Space' && dog.mode === 'swim') { for (let i = 0; i < 3; i++) spawnRipple(dog.group.position.x, dog.group.position.z, 1.6); dog.splash(); }
+  if (e.code === 'KeyE') dog.shake();
 });
 addEventListener('keyup', (e) => (keys[e.code] = false));
 let drag = null;
@@ -245,7 +250,9 @@ const clock = new THREE.Clock();
 let heading = Math.PI, speed = 0, rippleTimer = 0, t = 0;
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 
-function inPool(x, z) { return x > POOL.x0 && x < 22 && z > -24 && z < POOL.z1; }
+// walkable area: the pool plus the right-hand bank (dog climbs out where ground rises above the water)
+function walkable(x, z) { return x > POOL.x0 && x < 46 && z > -24 && z < POOL.z1; }
+const WATERLINE = -0.35; // ground below this = swimming
 
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05); t += dt;
@@ -258,22 +265,26 @@ function tick() {
   let thrust = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 0.5 : 0);
   if (drag) { turn = THREE.MathUtils.clamp(-drag.dx / 120, -1, 1); thrust = THREE.MathUtils.clamp(-drag.dy / 120 + 0.6, -0.5, 1); }
   heading += turn * dt * 1.8;
-  speed = THREE.MathUtils.lerp(speed, thrust * 4.5, dt * 2);
+  const onLand = dog.mode === 'land';
+  const top = onLand ? (keys.ShiftLeft || keys.ShiftRight ? 7 : 3.2) : 4.5;
+  speed = THREE.MathUtils.lerp(speed, thrust * top, dt * (onLand ? 4 : 2));
   const p = dog.group.position;
   const nx = p.x + Math.sin(heading) * speed * dt, nz = p.z + Math.cos(heading) * speed * dt;
-  if (inPool(nx, nz)) { p.x = nx; p.z = nz; } else speed *= 0.5;
+  if (walkable(nx, nz)) { p.x = nx; p.z = nz; } else speed *= 0.5;
   dog.group.rotation.y = heading;
-  dog.update(dt, Math.abs(speed));
+  const gy = groundHeight(p.x, p.z);
+  const inWater = gy < WATERLINE;
+  dog.update(dt, speed, inWater, gy);
 
   rippleTimer += dt * (0.6 + Math.abs(speed) * 0.5);
-  if (rippleTimer > 0.5) { rippleTimer = 0; spawnRipple(p.x, p.z, 0.6 + Math.abs(speed) * 0.1); }
+  if (inWater && rippleTimer > 0.5) { rippleTimer = 0; spawnRipple(p.x, p.z, 0.6 + Math.abs(speed) * 0.1); }
 
   buddies.forEach((b, i) => {
     b.phase += dt * 0.25;
     const r = 7 + i * 3;
     b.group.position.set(-8 + i * 10 + Math.cos(b.phase) * r, 0, -2 - i * 5 + Math.sin(b.phase) * r * 0.6);
     b.group.rotation.y = -b.phase + (i ? 0 : Math.PI);
-    b.update(dt, 2.5);
+    b.update(dt, 2.5, true);
     if (Math.random() < dt * 1.5) spawnRipple(b.group.position.x, b.group.position.z, 0.6);
   });
 
@@ -285,15 +296,22 @@ function tick() {
   }
 
   // low, dog's-eye chase camera
-  camPos.set(p.x - Math.sin(heading) * 5.0, 1.6, p.z - Math.cos(heading) * 5.0);
-  camLook.set(p.x + Math.sin(heading) * 8, 0.2, p.z + Math.cos(heading) * 8);
+  const camBase = Math.max(0, p.y);
+  camPos.set(p.x - Math.sin(heading) * 5.0, camBase + 1.6, p.z - Math.cos(heading) * 5.0);
+  camLook.set(p.x + Math.sin(heading) * 8, camBase + 0.2, p.z + Math.cos(heading) * 8);
+
+  // fur LOD: fewer shells further from camera
+  for (const d of [dog, ...buddies]) {
+    const dist = d.group.position.distanceTo(camera.position);
+    d.setFurDetail(dist < 12 ? 24 : dist < 30 ? 12 : 6);
+  }
   camera.position.lerp(camPos, 1 - Math.exp(-dt * 4));
   camera.lookAt(camLook);
 
   R.render(dt);
   if (hud.style.display === 'block') {
     const px = R.renderer.getPixelRatio();
-    hud.textContent = `${(1 / dt).toFixed(0)} fps · internal ${Math.round(innerWidth * px)}×${Math.round(innerHeight * px)}`;
+    hud.textContent = `${(1 / dt).toFixed(0)} fps · internal ${Math.round(innerWidth * px)}×${Math.round(innerHeight * px)} · ${dog.mode} · wet ${dog.wet.toFixed(2)}`;
   }
   requestAnimationFrame(tick);
 }
