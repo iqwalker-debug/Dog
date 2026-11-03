@@ -7,7 +7,7 @@ import { createDog } from '../dog.js';
 const canvas = document.getElementById('game');
 const hud = document.getElementById('hud');
 const help = document.getElementById('help');
-help.textContent = 'W/S walk · A/D drift · Shift brisk · V camera · Space call dogs · 1 swimming hole';
+help.textContent = 'W/S walk · A/D drift · Shift brisk · V camera · Space call dogs · L next level · 1 swimming hole';
 const R = createPainterlyRenderer(canvas);
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog('#d8e6c8', 25, 95);
@@ -244,6 +244,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'F3') { e.preventDefault(); hud.style.display = hud.style.display === 'block' ? 'none' : 'block'; }
   if (e.code === 'Space') pack.forEach((d) => { d.sniffing = 0; d.dog.sniff(false); });
   if (e.code === 'Digit1') location.search = '';
+  if (e.code === 'KeyL') location.search = '?level=bluff';
 });
 addEventListener('keyup', (e) => (keys[e.code] = false));
 let drag = null;

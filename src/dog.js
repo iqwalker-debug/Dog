@@ -233,13 +233,15 @@ export function createDog(opts = {}) {
     setPose(p) { poseMode = p; },
     get pose() { return pose; },
     sniff(on = true) { sniffing = on; },
+    wetten(amount) { wet = Math.min(1, wet + amount); landTime = 0; }, // wading
+    mouthWorld(out = new THREE.Vector3()) { return jaw.localToWorld(out.set(0, 0.02, B.snout * 0.6 + 0.05)); },
     collarWorld(out = new THREE.Vector3()) { return rig.localToWorld(out.set(0, 0.3, 0.55)); },
     setFurDetail(k) { furs.forEach((f) => f.userData.fur.setShells(Math.ceil((k / 24) * B.shells))); },
     dispose() {
       group.traverse((o) => { o.geometry?.dispose(); });
       drops.geometry.dispose(); drops.removeFromParent();
     },
-    update(dt, speed, inWater = true, groundY = -1.4) {
+    update(dt, speed, inWater = true, groundY = -1.4, waterY = 0) {
       t += dt;
       const run = Math.min(Math.abs(speed) / 5, 1);
       mode = inWater ? 'swim' : 'land';
@@ -248,7 +250,7 @@ export function createDog(opts = {}) {
       if (inWater) {
         wet = Math.min(1, wet + dt * 2);
         landTime = 0;
-        group.position.y = THREE.MathUtils.lerp(group.position.y, 0, 1 - Math.exp(-dt * 6));
+        group.position.y = THREE.MathUtils.lerp(group.position.y, waterY, 1 - Math.exp(-dt * 6));
         gait += dt * (4 + Math.abs(speed) * 1.5);
         rig.position.y = -0.1 * S + Math.sin(t * 2.6) * 0.035 + (splashT > 0 ? Math.sin(splashT * 10) * 0.12 : 0);
         rig.rotation.x = -0.2;

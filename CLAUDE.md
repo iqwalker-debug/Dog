@@ -22,7 +22,14 @@
 - Levels: `src/main.js` loads `src/levels/<name>.js` from `?level=`. swimhole (default, level 1),
   trail (level 5: pack walk, 4 dogs on verlet-rope leashes, sniff breaks, NPC walkers, oak canopy
   dapple, wildflowers, leaf litter; V = POV/3rd person). T in level 1 -> trail, 1 in trail -> back.
-  Next: levels 6–8 (limestone bluff creek bed, hill-country creek, shallow golden river), fetch/treat gameplay.
+- `src/world.js` (step 6): shared engine for dog-controlled levels — runLevel({groundH, waterY, build, ...})
+  gives sky/sun/water/terrain/forest/scatter helpers, player dog (swim when deep, wade + wet when shallow),
+  buddy AI (follow, wander, sniff, chase ball, bring it back), 12 treats per level, fetch race (F / double-tap),
+  L cycles levels: swimhole -> trail -> bluff -> creek -> river.
+  Levels 6 bluff (boulders are part of the ground — hop them), 7 creek (stepping slabs, pool, prickly pear,
+  susans, caustics), 8 river (golden shallows, heavy glints, far wall, skyline).
+  Next: levels 2–4 (greenbelt creek, off-leash park, Violet Crown arch), swim races, painted texture detail
+  on trunks/leaves, migrate swimhole onto world.js.
 - `reference/` — Ian's 16 target paintings. Compare screenshots against these.
   - 1–8: swimming hole, greenbelt creek, off-leash park, Violet Crown Trail arch
   - 9: French bulldog (fawn, black mask, blue harness) + red doodle lounging on granite boulders
