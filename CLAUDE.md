@@ -16,8 +16,13 @@
   `?showroom=husky` gives a close-up. Faces (step 4): carved eye sockets, brows, cheeks, lips/flews, Frenchie wrinkles,
   nose with nostrils, iris/pupil/catch-light eyes with lids (blink, happy squint, eyes-closed
   bliss when idle on land), hinged jaw that pants with tongue out, short muzzle fur via aLen.
-  `?showroom=golden&face` = portrait camera. Next: in-the-moment poses (sit, lie on rocks),
-  leash walking (level 5), richer foliage to match paintings 11, 14, 15.
+  `?showroom=golden&face` = portrait camera.
+- Poses (step 5): dog.setPose('auto'|'sit'|'lie'|'stand') — auto sits after 4s idle, lies after 12s;
+  dog.sniff(on) lowers head with nose twitch; C cycles poses in level 1; `?showroom=x&pose=lie`.
+- Levels: `src/main.js` loads `src/levels/<name>.js` from `?level=`. swimhole (default, level 1),
+  trail (level 5: pack walk, 4 dogs on verlet-rope leashes, sniff breaks, NPC walkers, oak canopy
+  dapple, wildflowers, leaf litter; V = POV/3rd person). T in level 1 -> trail, 1 in trail -> back.
+  Next: levels 6–8 (limestone bluff creek bed, hill-country creek, shallow golden river), fetch/treat gameplay.
 - `reference/` — Ian's 16 target paintings. Compare screenshots against these.
   - 1–8: swimming hole, greenbelt creek, off-leash park, Violet Crown Trail arch
   - 9: French bulldog (fawn, black mask, blue harness) + red doodle lounging on granite boulders
