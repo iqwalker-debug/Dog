@@ -220,6 +220,7 @@ export function createDog(opts = {}) {
 
   let t = Math.random() * 10, gait = 0, splashT = 0, shakeT = 0, wet = 0, landTime = 0;
   let prevY = 0, prevVy = 0, mode = 'swim', mouthOpen = 0, idle = 0, blinkT = 2;
+  let poseMode = 'auto', pose = 'stand', sitB = 0, lieB = 0, sniffing = false, sniffB = 0;
   const wagBase = tailRoot.rotation.x;
 
   const api = {
@@ -228,6 +229,11 @@ export function createDog(opts = {}) {
     get mode() { return mode; },
     splash() { splashT = 0.6; },
     shake() { if (shakeT <= 0) shakeT = 1.1; },
+    /** 'auto' (sits after 4s idle, lies down after 12s), 'stand', 'sit', 'lie' */
+    setPose(p) { poseMode = p; },
+    get pose() { return pose; },
+    sniff(on = true) { sniffing = on; },
+    collarWorld(out = new THREE.Vector3()) { return rig.localToWorld(out.set(0, 0.3, 0.55)); },
     setFurDetail(k) { furs.forEach((f) => f.userData.fur.setShells(Math.ceil((k / 24) * B.shells))); },
     dispose() {
       group.traverse((o) => { o.geometry?.dispose(); });
@@ -272,7 +278,35 @@ export function createDog(opts = {}) {
         tongue.visible = true;
         mouthOpen = 0.32 + run * 0.12 + Math.sin(t * 9) * 0.05; // panting
         idle = Math.abs(speed) < 0.2 ? idle + dt : 0;
+
+        // ---- poses: sit / lie, blended in when stopped ----
+        pose = poseMode === 'auto' ? (idle > 12 ? 'lie' : idle > 4 ? 'sit' : 'stand') : poseMode;
+        if (Math.abs(speed) > 0.3) pose = 'stand';
+        const k = 1 - Math.exp(-dt * 4);
+        sitB = THREE.MathUtils.lerp(sitB, pose === 'sit' ? 1 : 0, k);
+        lieB = THREE.MathUtils.lerp(lieB, pose === 'lie' ? 1 : 0, k);
+        const lieDrop = (B.legH - 0.22 * S);
+        rig.position.y += -0.3 * B.legH * sitB - lieDrop * lieB;
+        rig.rotation.x += -0.42 * sitB;
+        legs.forEach((l) => {
+          if (l.front) {
+            l.hip.rotation.x = THREE.MathUtils.lerp(l.hip.rotation.x, 0.42, sitB);
+            l.knee.rotation.x = THREE.MathUtils.lerp(l.knee.rotation.x, 0, sitB);
+            l.hip.rotation.x = THREE.MathUtils.lerp(l.hip.rotation.x, -1.45, lieB);   // paws forward
+            l.knee.rotation.x = THREE.MathUtils.lerp(l.knee.rotation.x, 0.15, lieB);
+          } else {
+            l.hip.rotation.x = THREE.MathUtils.lerp(l.hip.rotation.x, -0.75, sitB);   // haunches
+            l.knee.rotation.x = THREE.MathUtils.lerp(l.knee.rotation.x, 2.3, sitB);
+            l.hip.rotation.x = THREE.MathUtils.lerp(l.hip.rotation.x, -1.3, lieB);
+            l.knee.rotation.x = THREE.MathUtils.lerp(l.knee.rotation.x, 2.5, lieB);
+          }
+        });
+        tailLift -= 0.6 * (sitB + lieB);
+        wagAmp *= 1 - 0.6 * lieB;
       }
+      sniffB = THREE.MathUtils.lerp(sniffB, sniffing && !inWater ? 1 : 0, 1 - Math.exp(-dt * 5));
+      neck.rotation.x = 0.75 * sniffB;
+      if (sniffB > 0.5) { mouthOpen = 0.02; nose.scale.setScalar(1 + Math.sin(t * 30) * 0.06); }
 
       // tail wag travels down the chain
       tailRoot.rotation.x = wagBase + tailLift;
