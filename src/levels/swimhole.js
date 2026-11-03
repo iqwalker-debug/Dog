@@ -248,6 +248,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyE') dog.shake();
   if (e.code === 'KeyC') dog.setPose(dog.pose === 'sit' ? 'lie' : dog.pose === 'lie' ? 'auto' : 'sit');
   if (e.code === 'KeyT') location.search = '?level=trail';
+  if (e.code === 'KeyL') location.search = '?level=trail';
   const dn = e.code.match(/^Digit(\d)$/); if (dn) swapBreed(BREED_ORDER[(+dn[1] + 9) % 10]);
 });
 addEventListener('keyup', (e) => (keys[e.code] = false));
