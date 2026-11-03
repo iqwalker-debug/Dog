@@ -9,21 +9,24 @@ export function makeFur(geometry, {
   base.computeVertexNormals();
   const P = base.attributes.position.array, N = base.attributes.normal.array;
   const n = P.length / 3;
+  const C = base.attributes.color ? base.attributes.color.array : null;
   const pos = new Float32Array(P.length * shells), nor = new Float32Array(N.length * shells), sh = new Float32Array(n * shells);
+  const col = C ? new Float32Array(C.length * shells) : null;
   for (let s = 0; s < shells; s++) {
-    pos.set(P, s * P.length); nor.set(N, s * N.length);
+    pos.set(P, s * P.length); nor.set(N, s * N.length); if (col) col.set(C, s * C.length);
     sh.fill((s + 1) / shells, s * n, (s + 1) * n);
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   geo.setAttribute('aShell', new THREE.BufferAttribute(sh, 1));
+  if (col) geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
 
   const uniforms = {
     uLen: { value: length }, uDensity: { value: density }, uWet: { value: 0 },
     uCurl: { value: curl }, uDroop: { value: droop },
   };
-  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.85 });
+  const mat = new THREE.MeshStandardMaterial({ color: col ? '#ffffff' : color, roughness: 0.85, vertexColors: !!col });
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uniforms);
     sh.vertexShader = sh.vertexShader
