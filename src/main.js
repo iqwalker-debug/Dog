@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { createPainterlyRenderer, makeRiverbedMaterial } from './painterly.js';
 import { createDog } from './dog.js';
+import { BREED_ORDER } from './breeds.js';
 
 const canvas = document.getElementById('game');
 const hud = document.getElementById('hud');
@@ -210,14 +211,22 @@ trunks.castShadow = leaves.castShadow = true; leaves.receiveShadow = true;
 scene.add(trunks, leaves);
 
 // ---------- Dog ----------
-const dog = createDog({ coat: '#1c1d22', belly: '#f2efe8' });
+let dog = createDog('golden');
 dog.group.position.set(-6, 0, 14);
 scene.add(dog.group, dog.drops);
 
+// number keys 1-0 swap the player's breed
+function swapBreed(key) {
+  const old = dog; dog = createDog(key);
+  dog.group.position.copy(old.group.position);
+  scene.remove(old.group); old.dispose(); scene.add(dog.group, dog.drops);
+  document.getElementById('help').textContent = `${dog.name} · WASD / drag · Shift run · Space splash · E shake · 1-0 breeds`;
+}
+
 // a couple of AI swimmers (doodle + lab) for life
 const buddies = [
-  createDog({ coat: '#b8733a', belly: '#c98a4f', curly: true }),
-  createDog({ coat: '#141414', belly: '#1e1e1e' }),
+  createDog('doodle'),
+  createDog('lab'),
 ];
 buddies.forEach((b, i) => { b.group.position.set(-10 + i * 12, 0, -4 - i * 6); b.phase = i * 2; scene.add(b.group, b.drops); });
 
@@ -237,12 +246,27 @@ addEventListener('keydown', (e) => {
   if (e.code === 'F3') { e.preventDefault(); hud.style.display = hud.style.display === 'block' ? 'none' : 'block'; }
   if (e.code === 'Space' && dog.mode === 'swim') { for (let i = 0; i < 3; i++) spawnRipple(dog.group.position.x, dog.group.position.z, 1.6); dog.splash(); }
   if (e.code === 'KeyE') dog.shake();
+  const dn = e.code.match(/^Digit(\d)$/); if (dn) swapBreed(BREED_ORDER[(+dn[1] + 9) % 10]);
 });
 addEventListener('keyup', (e) => (keys[e.code] = false));
 let drag = null;
 canvas.addEventListener('pointerdown', (e) => (drag = { x: e.clientX, y: e.clientY, dx: 0, dy: 0 }));
 addEventListener('pointermove', (e) => { if (drag) { drag.dx = e.clientX - drag.x; drag.dy = e.clientY - drag.y; } });
 addEventListener('pointerup', () => (drag = null));
+
+// ---------- Showroom (?showroom): every breed lined up on the beach ----------
+const SHOWROOM = new URLSearchParams(location.search).has('showroom');
+const SOLO = new URLSearchParams(location.search).get('showroom'); // ?showroom=husky for a close-up
+const lineup = [];
+if (SHOWROOM) {
+  (BREED_ORDER.includes(SOLO) ? [SOLO] : BREED_ORDER).forEach((k, i) => {
+    const d = createDog(k);
+    const x = 30 + (i % 5) * 2.2, z = 6 + Math.floor(i / 5) * 3;
+    d.group.position.set(x, groundHeight(x, z) + 0.6, z); d.group.rotation.y = -Math.PI / 2 + 0.5;
+    scene.add(d.group, d.drops); lineup.push(d);
+  });
+  dog.group.visible = false;
+}
 
 // ---------- Loop ----------
 R.setup(scene, camera);
@@ -308,6 +332,17 @@ function tick() {
   camera.position.lerp(camPos, 1 - Math.exp(-dt * 4));
   camera.lookAt(camLook);
 
+  if (SHOWROOM) {
+    lineup.forEach((d) => { d.update(dt, 0, false, groundHeight(d.group.position.x, d.group.position.z)); d.setFurDetail(24); });
+    if (lineup.length === 1) {
+      const d = lineup[0].group.position;
+      camera.position.set(d.x - 1.2, d.y + 0.35, d.z + 2.0);
+      camera.lookAt(d.x, d.y - 0.05, d.z);
+    } else {
+      camera.position.set(34.4, groundHeight(34, 13) + 1.6, 13.5);
+      camera.lookAt(34.4, groundHeight(34, 7) + 0.3, 6.8);
+    }
+  }
   R.render(dt);
   if (hud.style.display === 'block') {
     const px = R.renderer.getPixelRatio();

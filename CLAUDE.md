@@ -8,7 +8,12 @@
 ## Current state
 - `src/painterly.js` — rendering foundation (paint filter, paper grain, glints, riverbed caustics, dynamic resolution). Extend, don't replace.
 - `src/main.js` — Level 1 prototype (swimming hole, graffiti wall, dam, oaks, ripples, 2 AI dogs)
-- `src/dog.js` + `src/fur.js` — DONE (step 2): shell fur (24/12/6 LOD), wet-fur clumping/darkening, ear springs, swim paddle, walk/trot/run (Shift), climb out onto the beach, auto shake-off with droplets (E to shake). Bodies are still primitive shapes; next upgrade is rigged GLB dogs using the same fur.js shells.
+- `src/dog.js` + `src/fur.js` + `src/sculpt.js` + `src/breeds.js` — DONE (steps 2–3):
+  sculpted one-piece bodies/heads (blended SDF shapes -> MarchingCubes), breed markings painted
+  into the fur via vertex colors, two-segment legs, breed ears (flop/erect/bat) and tails
+  (feather/plume/otter/pom/stub), collars/harnesses, shell fur with wet clumping, swim/walk/run/shake.
+  10 breeds in breeds.js; keys 1–0 swap the player's breed; `?showroom` lines them all up,
+  `?showroom=husky` gives a close-up. Next: refine faces (brow, lips, cheeks) against paintings 9–16.
 - `reference/` — Ian's 16 target paintings. Compare screenshots against these.
   - 1–8: swimming hole, greenbelt creek, off-leash park, Violet Crown Trail arch
   - 9: French bulldog (fawn, black mask, blue harness) + red doodle lounging on granite boulders
