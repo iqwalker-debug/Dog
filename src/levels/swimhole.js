@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { createPainterlyRenderer, makeRiverbedMaterial } from '../painterly.js';
 import { createDog } from '../dog.js';
 import { BREED_ORDER } from '../breeds.js';
+import { placeTree, updateTrees } from '../trees.js';
+import { addDetail, TEX } from '../textures.js';
 
 const canvas = document.getElementById('game');
 const hud = document.getElementById('hud');
@@ -79,14 +81,14 @@ const bedGeo = new THREE.PlaneGeometry(140, 120, 180, 160).rotateX(-Math.PI / 2)
   bedGeo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   bedGeo.computeVertexNormals();
 }
-const bedMat = makeRiverbedMaterial(new THREE.Color('#ffffff'));
+const bedMat = addDetail(makeRiverbedMaterial(new THREE.Color('#ffffff')), TEX.pebbles, { scale: 0.35, strength: 0.7 });
 bedMat.vertexColors = true;
 const bed = new THREE.Mesh(bedGeo, bedMat);
 bed.receiveShadow = true;
 scene.add(bed);
 
 // submerged limestone slabs
-const rockMat = makeRiverbedMaterial(new THREE.Color('#c2ad62'));
+const rockMat = addDetail(makeRiverbedMaterial(new THREE.Color('#c2ad62')), TEX.boulder, { scale: 0.5 });
 const rocks = [];
 for (let i = 0; i < 26; i++) {
   const g = new THREE.DodecahedronGeometry(1, 1);
@@ -192,23 +194,11 @@ for (let i = 0; i < 26; i++) {
   treeSpots.push([x, z]);
 }
 for (let i = 0; i < 18; i++) treeSpots.push([-60 + Math.random() * 100, -34 - Math.random() * 14]);
-const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, treeSpots.length);
-const leaves = new THREE.InstancedMesh(leafGeo, leafMat, treeSpots.length * 6);
-const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3();
-const leafCols = ['#9cc23c', '#6fa13a', '#b8d24a', '#4f8a33', '#c7dc5a'].map((c) => new THREE.Color(c));
-let li = 0;
-treeSpots.forEach(([x, z], i) => {
+treeSpots.forEach(([x, z]) => {
   const y = z < -28 ? 2.7 : groundHeight(x, z);
-  M.compose(P.set(x, y + 3.5, z), Q.identity(), S.set(1, 1, 1)); trunks.setMatrixAt(i, M);
-  for (let k = 0; k < 6; k++) {
-    const s = 0.9 + Math.random() * 0.8;
-    M.compose(P.set(x + (Math.random() - 0.5) * 6, y + 7 + Math.random() * 3, z + (Math.random() - 0.5) * 6),
-      Q.setFromEuler(new THREE.Euler(Math.random(), Math.random(), 0)), S.set(s * 1.3, s * 0.8, s * 1.3));
-    leaves.setMatrixAt(li, M); leaves.setColorAt(li, leafCols[(Math.random() * leafCols.length) | 0]); li++;
-  }
+  placeTree(scene, new THREE.Vector3(x, y, z), { height: 9 + Math.random() * 5 });
 });
-trunks.castShadow = leaves.castShadow = true; leaves.receiveShadow = true;
-scene.add(trunks, leaves);
+for (let i = 0; i < 12; i++) { const x = 24 + Math.random() * 20, z = -24 + Math.random() * 48; if (!(x < 44 && z > -8 && z < 18)) placeTree(scene, new THREE.Vector3(x, groundHeight(x, z), z), { height: 1 + Math.random(), bush: true }); }
 
 // ---------- Dog ----------
 let dog = createDog('golden');
@@ -354,6 +344,7 @@ function tick() {
       camera.lookAt(34.4, groundHeight(34, 7) + 0.3, 6.8);
     }
   }
+  updateTrees(t);
   R.render(dt);
   if (hud.style.display === 'block') {
     const px = R.renderer.getPixelRatio();

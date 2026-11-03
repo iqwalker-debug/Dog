@@ -1,5 +1,5 @@
 // Level 6 — Dry limestone creek bed under a layered limestone bluff (painting 12). Boulder hopping.
-import { runLevel, THREE, seeded } from '../world.js';
+import { runLevel, THREE, seeded, addDetail, TEX } from '../world.js';
 
 const rnd = seeded(61);
 // boulders are part of the ground, so dogs climb over them
@@ -35,7 +35,7 @@ runLevel({
   build({ scene, terrain, scatter, forest, rnd }) {
     const lime = new THREE.Color('#cfc8b4'), limeWarm = new THREE.Color('#ddd0ae'), grey = new THREE.Color('#a9a596'), soil = new THREE.Color('#8f8458'), green = new THREE.Color('#7d9440');
     terrain({
-      w: 110, d: 90, cz: -8, seg: 2.2, height: groundH,
+      w: 110, d: 90, cz: -8, seg: 2.2, height: groundH, detail: TEX.riverbed,
       color: (x, z, y) => {
         const n = Math.sin(x * 2.3) * Math.cos(z * 1.9) * 0.5 + 0.5, n2 = Math.sin(x * 0.7 + z * 0.9) * 0.5 + 0.5;
         let c = lime.clone().lerp(grey, n * 0.45).lerp(limeWarm, n2 * 0.4);
@@ -46,7 +46,7 @@ runLevel({
     });
 
     // boulder rocks (visual shells matching the height bumps)
-    scatter(new THREE.DodecahedronGeometry(1, 2), new THREE.MeshStandardMaterial({ roughness: 0.95, flatShading: false }), boulders.length - 1, (i) => {
+    scatter(new THREE.DodecahedronGeometry(1, 2), addDetail(new THREE.MeshStandardMaterial({ roughness: 0.95 }), TEX.boulder, { scale: 0.45 }), boulders.length - 1, (i) => {
       const b = boulders[i];
       return { p: new THREE.Vector3(b.x, base(b.x, b.z) - b.h * 0.15, b.z), s: new THREE.Vector3(b.r * 1.02, b.h * 1.15, b.r * (0.8 + rnd() * 0.3)), c: [limeWarm, lime, new THREE.Color('#e9dcb8')][(rnd() * 3) | 0].clone().multiplyScalar(1.0 + rnd() * 0.12) };
     }, { cast: true });
@@ -57,7 +57,7 @@ runLevel({
     });
 
     // layered bluff: stacked ledges with overhangs
-    const ledgeCols = ['#e3d6b2', '#cfc0a0', '#efe2bf', '#c6b896', '#dccfa9'].map((c) => new THREE.Color(c));
+    const ledgeMats = ['#e3d6b2', '#cfc0a0', '#efe2bf', '#c6b896', '#dccfa9'].map((c) => addDetail(new THREE.MeshStandardMaterial({ color: c, roughness: 1 }), TEX.boulder, { scale: 0.3 }));
     for (let layer = 0; layer < 7; layer++) {
       const y = 1.5 + layer * 2.1;
       for (let x = -60; x < 60; x += 2.4 + rnd() * 2) {
@@ -66,7 +66,7 @@ runLevel({
         const g = new THREE.BoxGeometry(w, h, 2.2, 3, 2, 1);
         const P = g.attributes.position; for (let i = 0; i < P.count; i++) P.setXYZ(i, P.getX(i) * (1 + (rnd() - 0.5) * 0.08), P.getY(i) + (rnd() - 0.5) * 0.15, P.getZ(i) + (rnd() - 0.5) * 0.25);
         g.computeVertexNormals();
-        const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: ledgeCols[(rnd() * 5) | 0], roughness: 1 }));
+        const m = new THREE.Mesh(g, ledgeMats[(rnd() * 5) | 0]);
         m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; scene.add(m);
       }
     }
@@ -74,7 +74,8 @@ runLevel({
     for (let x = -60; x < 60; x += 2 + rnd() * 2) forest.blob(x, 17 + rnd() * 2, -31 - rnd() * 6, 1.2 + rnd() * 1.4, new THREE.Color(['#6e9a34', '#94b83b', '#5a8a30'][(rnd() * 3) | 0]));
     for (let i = 0; i < 40; i++) { const x = -55 + rnd() * 110, layer = (rnd() * 6) | 0; forest.blob(x, 2.6 + layer * 2.1, -24.8 - layer * 0.55, 0.4 + rnd() * 0.5, new THREE.Color('#7fa33a')); }
     for (let i = 0; i < 14; i++) { const x = -45 + rnd() * 90, z = -21 + rnd() * 3; forest.tree(new THREE.Vector3(x, groundH(x, z), z), 5 + rnd() * 4, new THREE.Vector3((rnd() - 0.5) * 2, 0, 1 + rnd() * 2), 2.6, 0.25); }
-    for (let i = 0; i < 70; i++) {
+    for (let i = 0; i < 26; i++) { const x = -45 + rnd() * 90, z = rnd() < 0.5 ? -20 + rnd() * 4 : 12 + rnd() * 10; forest.bush(new THREE.Vector3(x, groundH(x, z), z), 1 + rnd() * 1.2); }
+    for (let i = 0; i < 40; i++) {
       const x = -45 + rnd() * 90, z = rnd() < 0.5 ? -20 + rnd() * 4 : 12 + rnd() * 10;
       forest.blob(x, groundH(x, z) + 0.4 + rnd() * 0.8, z, 0.4 + rnd() * 0.7, new THREE.Color(['#c9cf3e', '#a7c23f', '#e0b640', '#8fb03a'][(rnd() * 4) | 0]));
     }

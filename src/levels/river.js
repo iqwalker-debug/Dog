@@ -1,5 +1,5 @@
 // Level 8 — Shallow golden-bottom river wading with heavy sun sparkle (painting 16).
-import { runLevel, THREE, seeded, makeRiverbedMaterial } from '../world.js';
+import { runLevel, THREE, seeded, makeRiverbedMaterial, addDetail, TEX } from '../world.js';
 
 const rnd = seeded(81);
 const bankL = (z) => -14 + Math.sin(z * 0.04) * 3;   // rocky beach side
@@ -27,7 +27,7 @@ runLevel({
     const gold = new THREE.Color('#c9a64e'), ochre = new THREE.Color('#a8873e'), teal = new THREE.Color('#4f8d78'), beach = new THREE.Color('#e3d6b6'), grass = new THREE.Color('#9fb54a');
     const bedMat = makeRiverbedMaterial(new THREE.Color('#ffffff'));
     terrain({
-      w: 120, d: 180, cx: 5, cz: -20, seg: 1.6, height: groundH, material: bedMat,
+      w: 120, d: 180, cx: 5, cz: -20, seg: 1.6, height: groundH, material: bedMat, detail: TEX.pebbles,
       color: (x, z, y) => {
         const n = Math.sin(x * 3.1) * Math.cos(z * 2.6) * 0.5 + 0.5;
         if (y < 0) return gold.clone().lerp(ochre, n * 0.6).lerp(teal, THREE.MathUtils.clamp(-y - 0.6, 0, 1) * 0.6);
@@ -40,7 +40,7 @@ runLevel({
       const z = -80 + R() * 130, x = bankL(z) - 4 + R() * 30, r = 0.08 + R() * R() * 0.35;
       return { p: new THREE.Vector3(x, groundH(x, z) - r * 0.2, z), s: new THREE.Vector3(r * 1.4, r * 0.5, r), c: new THREE.Color(['#d6b55e', '#b89448', '#c9c0a2', '#9e8a52', '#e2c877'][(R() * 5) | 0]) };
     });
-    scatter(new THREE.DodecahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ roughness: 1 }), 120, () => {
+    scatter(new THREE.DodecahedronGeometry(1, 1), addDetail(new THREE.MeshStandardMaterial({ roughness: 1 }), TEX.boulder, { scale: 0.5 }), 120, () => {
       const z = -80 + R() * 130, x = bankL(z) - R() * 3, r = 0.3 + R() * 0.6;
       return { p: new THREE.Vector3(x, groundH(x, z), z), s: new THREE.Vector3(r * 1.3, r * 0.6, r), c: new THREE.Color(['#e6dcc4', '#d4c8aa'][(R() * 2) | 0]) };
     }, { cast: true });

@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { N8AOPass } from 'n8ao'; // ambient occlusion (github.com/N8python/n8ao)
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
@@ -146,7 +147,14 @@ export function createPainterlyRenderer(canvas) {
 
   function setup(scene, camera) {
     composer.passes.length = 0;
-    composer.addPass(new RenderPass(scene, camera));
+    const useAO = new URLSearchParams(location.search).get('ao') !== '0'; // ?ao=0 turns it off
+    if (useAO) {
+      const ao = new N8AOPass(scene, camera, Math.max(1, innerWidth), Math.max(1, innerHeight));
+      Object.assign(ao.configuration, { aoRadius: 1.6, distanceFalloff: 1.0, intensity: 2.6, gammaCorrection: false, halfRes: true });
+      ao.configuration.color = new THREE.Color('#2b2416'); // warm umber shadows, like pigment
+      ao.setQualityMode('Medium');
+      composer.addPass(ao);
+    } else composer.addPass(new RenderPass(scene, camera));
     composer.addPass(new OutputPass()); // tone map + sRGB first, so we paint in display colors
     composer.addPass(painterly);
     resize();

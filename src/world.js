@@ -4,6 +4,9 @@ import * as THREE from 'three';
 import { createPainterlyRenderer, makeRiverbedMaterial } from './painterly.js';
 import { createDog } from './dog.js';
 import { BREED_ORDER } from './breeds.js';
+import { placeTree, updateTrees } from './trees.js';
+import { addDetail, TEX } from './textures.js';
+export { addDetail, TEX, placeTree };
 
 export const LEVEL_ORDER = ['swimhole', 'trail', 'bluff', 'creek', 'river'];
 export const nextLevel = (cur) => LEVEL_ORDER[(LEVEL_ORDER.indexOf(cur) + 1) % LEVEL_ORDER.length];
@@ -32,7 +35,7 @@ export function scatter(scene, geo, mat, n, place, { cast = false, receive = tru
 }
 
 /** Ground mesh from a height function with per-vertex colors. */
-export function terrain(scene, { w, d, cx = 0, cz = 0, seg = 1.6, height, color, material }) {
+export function terrain(scene, { w, d, cx = 0, cz = 0, seg = 1.6, height, color, material, detail = null }) {
   const g = new THREE.PlaneGeometry(w, d, Math.round(w * seg), Math.round(d * seg)).rotateX(-Math.PI / 2).translate(cx, 0, cz);
   const P = g.attributes.position, col = new Float32Array(P.count * 3);
   for (let i = 0; i < P.count; i++) {
@@ -44,6 +47,7 @@ export function terrain(scene, { w, d, cx = 0, cz = 0, seg = 1.6, height, color,
   g.computeVertexNormals();
   const mat = material || new THREE.MeshStandardMaterial({ roughness: 1 });
   mat.vertexColors = true;
+  if (detail) addDetail(mat, detail, { scale: 0.3, strength: 0.75 });
   const m = new THREE.Mesh(g, mat); m.receiveShadow = true; scene.add(m); return m;
 }
 
@@ -61,23 +65,11 @@ export function makeForest(scene, rnd, max = 5000) {
   };
   return {
     blob,
-    /** base Vector3, height, lean Vector3 (x,z), spread radius, yellow 0..1 */
-    tree(base, h = 7, lean = new THREE.Vector3(), spread = 3.6, yellow = 0) {
-      const top = base.clone().add(new THREE.Vector3(lean.x, h, lean.z));
-      const mid = base.clone().lerp(top, 0.5).add(new THREE.Vector3((rnd() - 0.5) * 1.2, 0, (rnd() - 0.5) * 1.2));
-      const trunk = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([base.clone().setY(base.y - 0.3), mid, top]), 10, 0.16 + rnd() * 0.14, 6), bark);
-      trunk.castShadow = true; scene.add(trunk);
-      // a couple of limbs
-      for (let k = 0; k < 2; k++) {
-        const a = rnd() * 6.28, end = top.clone().add(new THREE.Vector3(Math.cos(a) * spread * 0.8, -0.6 + rnd(), Math.sin(a) * spread * 0.8));
-        scene.add(Object.assign(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([mid, top.clone().lerp(end, 0.4).setY(top.y + 0.4), end]), 8, 0.08, 5), bark), { castShadow: true }));
-      }
-      for (let k = 0; k < 30; k++) {
-        const a = rnd() * 6.28, r = 0.8 + Math.sqrt(rnd()) * spread, y = top.y + (rnd() - 0.3) * 1.8;
-        const c = (rnd() < yellow ? cols[6] : cols[(rnd() * 6) | 0]).clone().multiplyScalar(0.8 + (y - top.y) * 0.15 + rnd() * 0.15);
-        blob(top.x + Math.cos(a) * r, y, top.z + Math.sin(a) * r, 0.5 + rnd() * 0.65, c);
-      }
+    /** Real branching tree (EZ-Tree). base Vector3, height m; yellow 0..1 picks golden aspens. */
+    tree(base, h = 7, lean = null, spread = 3.6, yellow = 0) {
+      return placeTree(scene, base, { height: h * 1.25, rnd, variant: rnd() < yellow ? 5 : (rnd() * 5) | 0 });
     },
+    bush(base, h = 1.2) { return placeTree(scene, base, { height: h, bush: true, rnd }); },
   };
 }
 
@@ -273,6 +265,7 @@ export function runLevel(cfg) {
   function tick() {
     const dt = Math.min(clock.getDelta(), 0.05); t += dt;
     water && (water.uniforms.uTime.value = t);
+    updateTrees(t);
     animated.forEach((a) => a(t, dt));
 
     // player
