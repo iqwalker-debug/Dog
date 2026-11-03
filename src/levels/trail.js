@@ -3,6 +3,8 @@
 import * as THREE from 'three';
 import { createPainterlyRenderer } from '../painterly.js';
 import { createDog } from '../dog.js';
+import { placeTree, updateTrees } from '../trees.js';
+import { addDetail, TEX } from '../textures.js';
 
 const canvas = document.getElementById('game');
 const hud = document.getElementById('hud');
@@ -66,7 +68,7 @@ const ground = new THREE.PlaneGeometry(90, 180, 180, 360).rotateX(-Math.PI / 2).
   ground.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   ground.computeVertexNormals();
 }
-const groundMesh = new THREE.Mesh(ground, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+const groundMesh = new THREE.Mesh(ground, addDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), TEX.forest, { scale: 0.4, strength: 0.8 }));
 groundMesh.receiveShadow = true;
 scene.add(groundMesh);
 
@@ -99,20 +101,13 @@ for (let s = -10; s < PATH_LEN + 10; s += 3.2 + rnd() * 2.5) {
     if (rnd() < 0.25) continue;
     const off = side * (3 + rnd() * 6);
     const base = onPath(s, off);
-    const h = 6 + rnd() * 4, lean = -side * (1.5 + rnd() * 2.5); // lean toward the path
-    const top = onPath(s + (rnd() - 0.5) * 3, off + lean); top.y = base.y + h;
-    const mid = base.clone().lerp(top, 0.5); mid.x += (rnd() - 0.5) * 1.2; mid.z += (rnd() - 0.5) * 1.2;
-    const trunk = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([base.clone().setY(base.y - 0.3), mid, top]), 10, 0.14 + rnd() * 0.12, 6), barkMat);
-    trunk.castShadow = true; scene.add(trunk);
-    // canopy: many small blobs, sunlit tops lighter
-    for (let k = 0; k < 30; k++) { // clumps with gaps so sun dapples through
-      const a = rnd() * Math.PI * 2, r = 1 + Math.sqrt(rnd()) * 3.4;
-      const y = top.y + (rnd() - 0.3) * 1.8;
-      const c = leafCols[(rnd() * leafCols.length) | 0].clone().multiplyScalar(0.8 + (y - top.y) * 0.15 + rnd() * 0.15);
-      blob(top.x + Math.cos(a) * r, y, top.z + Math.sin(a) * r, 0.5 + rnd() * 0.6, c);
-    }
+    // real branching oak (EZ-Tree), tilted slightly toward the path so canopies arch over it
+    const tree = placeTree(scene, base, { height: 9 + rnd() * 5, rnd, variant: rnd() < 0.15 ? 5 : (rnd() * 5) | 0 });
+    path.getTangentAt(THREE.MathUtils.clamp(s / PATH_LEN, 0, 1), tmpT);
+    tree.rotateOnWorldAxis(tmpT, side * (0.08 + rnd() * 0.1));
     // understory shrubs
-    for (let k = 0; k < 4; k++) {
+    for (let k = 0; k < 2; k++) placeTree(scene, onPath(s + (rnd() - 0.5) * 4, side * (2.6 + rnd() * 3)), { height: 0.9 + rnd() * 1.1, bush: true, rnd });
+    for (let k = 0; k < 2; k++) {
       const p = onPath(s + (rnd() - 0.5) * 4, side * (2.4 + rnd() * 3));
       blob(p.x, p.y + 0.3 + rnd() * 0.6, p.z, 0.4 + rnd() * 0.5, pick(leafCols).clone().multiplyScalar(0.75));
     }
@@ -129,7 +124,7 @@ function scatter(geo, mat, n, place, shadow = false) {
   im.castShadow = shadow; im.receiveShadow = true; scene.add(im); return im;
 }
 const rockCols = ['#cfc8b6', '#b9b3a3', '#d9d2bf', '#a9a596'].map((c) => new THREE.Color(c));
-scatter(new THREE.DodecahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ roughness: 0.95 }), 160, () => {
+scatter(new THREE.DodecahedronGeometry(1, 2), addDetail(new THREE.MeshStandardMaterial({ roughness: 0.95 }), TEX.boulder, { scale: 0.6 }), 160, () => {
   const p = onPath(rnd() * PATH_LEN, (rnd() < 0.5 ? -1 : 1) * (1.2 + rnd() * 3.5) * (rnd() < 0.15 ? 0.4 : 1));
   const r = 0.12 + rnd() * rnd() * 0.7;
   return { p: p.setY(p.y + r * 0.2), s: S3.set(r * 1.4, r * 0.7, r), c: pick(rockCols) };
@@ -339,6 +334,7 @@ function tick() {
   sun.position.copy(wp).add(tgt.set(-8, 34, 6));
   sun.target.position.copy(wp);
 
+  updateTrees(t);
   R.render(dt);
   if (hud.style.display === 'block') hud.textContent = `${(1 / dt).toFixed(0)} fps · ${s.toFixed(0)}/${PATH_LEN.toFixed(0)} m`;
   requestAnimationFrame(tick);

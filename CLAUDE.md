@@ -41,6 +41,13 @@
   - 15: hill-country creek landscape: oak canopy, prickly pear, black-eyed susans, limestone slabs
   - 16: black lab, white doodle, red doodle wading shallow golden-bottom river with sun sparkle
 - Note: UnrealBloomPass rendered black in testing; glints in the paint pass replace it.
+- Graphics upgrade (step 7, see CREDITS.md):
+  - `src/trees.js`: EZ-Tree real branching oaks/aspens/bushes (6 shared variants, leaf wind sway,
+    cut-out leaf shadows). Its leaf shader ignores instanceMatrix, so placements are Mesh clones, not
+    InstancedMesh. `forest.tree()` / `forest.bush()` in world.js use it; blobs remain for distant hills.
+  - `src/textures.js`: Poly Haven CC0 textures as triplanar luminance detail (`addDetail(mat, TEX.x)`) so
+    the painted vertex colors keep the palette. Chains with existing onBeforeCompile (caustics).
+  - N8AO ambient occlusion in painterly.js (warm umber, half-res). `?ao=0` disables it.
 
 ## Brief
 Build a 3D dog-adventure game in Three.js (Vite + TypeScript) whose every frame
