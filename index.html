@@ -672,8 +672,12 @@ const MODELS = {};
 function loadModels() {
   if (!THREE.GLTFLoader) return;
   const loader = new THREE.GLTFLoader();
+  // Try the raw .glb first; hosts that only serve web types get a base64 copy in <name>.glb.json
+  const fetchModel = url => fetch(url).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+    .catch(() => fetch(url + '.json').then(r => { if (!r.ok) throw new Error('no model file'); return r.json(); })
+      .then(j => { const bin = atob(j.data), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }));
   for (const [breed, url] of Object.entries(MODEL_FILES)) {
-    loader.load(url, gltf => {
+    fetchModel(url).then(buf => new Promise((res, rej) => loader.parse(buf, '', res, rej))).then(gltf => {
       const toS = x => x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(x, 1 / 2.4) - 0.055, seen = new Set();
       gltf.scene.traverse(o => {
         if (!o.isMesh) return;
@@ -687,7 +691,7 @@ function loadModels() {
       for (const k of Object.keys(portraitCache)) if (k.startsWith(breed)) delete portraitCache[k];
       actorSig = ''; if (S && S.started && world) syncActors();
       renderUI();
-    }, undefined, err => console.warn('Model not loaded, using built-in dog for', breed, err && err.message));
+    }).catch(err => console.warn('Model not loaded, using built-in dog for', breed, err && err.message));
   }
 }
 function buildDogFromModel(breed, stage) {
