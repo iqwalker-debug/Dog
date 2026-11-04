@@ -185,6 +185,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 800; margin: 0; text
 <div class="loading" id="loading">Painting the greenbelt…</div>
 <div class="fps" id="fps" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script src="vendor/GLTFLoader.js"></script>
 <script>
 "use strict";
 // =====================================================================
@@ -665,7 +666,46 @@ function glowSprite(color, s, op = 0.7) { const sp = new THREE.Sprite(new THREE.
 // =====================================================================
 // DOG MODEL
 // =====================================================================
+// Imported 3D models (GLB). Breeds without one use the procedural builder below.
+const MODEL_FILES = { goldendoodle: 'models/goldendoodle.glb' };
+const MODELS = {};
+function loadModels() {
+  if (!THREE.GLTFLoader) return;
+  const loader = new THREE.GLTFLoader();
+  for (const [breed, url] of Object.entries(MODEL_FILES)) {
+    loader.load(url, gltf => {
+      const toS = x => x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(x, 1 / 2.4) - 0.055, seen = new Set();
+      gltf.scene.traverse(o => {
+        if (!o.isMesh) return;
+        o.castShadow = true; o.receiveShadow = true; o.geometry.userData.shared = true;
+        // glTF stores linear colours; this game renders in display space, so convert once
+        const col = o.geometry.attributes.color;
+        if (col && !seen.has(col)) { seen.add(col); for (let i = 0; i < col.count; i++) col.setXYZ(i, toS(col.getX(i)), toS(col.getY(i)), toS(col.getZ(i))); col.needsUpdate = true; }
+        for (const m of [].concat(o.material)) { if (seen.has(m)) continue; seen.add(m); m.color.convertLinearToSRGB(); if (m.map) { m.map.encoding = THREE.LinearEncoding; m.map.needsUpdate = true; } m.envMapIntensity = 0; m.needsUpdate = true; }
+      });
+      MODELS[breed] = { scene: gltf.scene, clip: gltf.animations[0] || null };
+      for (const k of Object.keys(portraitCache)) if (k.startsWith(breed)) delete portraitCache[k];
+      actorSig = ''; if (S && S.started && world) syncActors();
+      renderUI();
+    }, undefined, err => console.warn('Model not loaded, using built-in dog for', breed, err && err.message));
+  }
+}
+function buildDogFromModel(breed, stage) {
+  const T = MODELS[breed], S0 = stage === 'puppy' ? 0.6 : stage === 'senior' ? 0.97 : 1;
+  const root = new THREE.Group(), sc = new THREE.Group(); sc.scale.setScalar(S0); root.add(sc);
+  const body = new THREE.Group(); sc.add(body);
+  const model = T.scene.clone(true); body.add(model);
+  const get = n => model.getObjectByName(n);
+  const sides = ['FrontLeft', 'FrontRight', 'HindLeft', 'HindRight'];
+  const legs = sides.map(n => get(n + '_UpperLeg') || new THREE.Group());
+  const head = new THREE.Group(); head.position.set(0, 0.66, 0.44); body.add(head);
+  const m = { root, sc, body, head, legs, tail: get('Tail') || new THREE.Group(), ears: [get('Ear_Left'), get('Ear_Right')].filter(Boolean),
+              tongue: new THREE.Object3D(), legH: 0.42, r: 0.2, S0, baseY: 0, bodyY: 0.42 * S0, glb: true };
+  if (T.clip) { m.mixer = new THREE.AnimationMixer(model); m.walk = m.mixer.clipAction(T.clip); m.walk.play(); m.walk.setEffectiveWeight(0); }
+  return m;
+}
 function buildDog(breed, stage, voidLook) {
+  if (!voidLook && MODELS[breed]) return buildDogFromModel(breed, stage);
   const L = BREEDS[breed].look, c = L.c, pup = stage === 'puppy', sen = stage === 'senior';
   const S0 = L.s * (pup ? 0.58 : sen ? 0.97 : 1);
   const fg = furGeo(L.fur), sg = sphereGeo(), seed = hashStr(breed) / 50, furAmt = L.fur === 'smooth' ? 0.6 : 1;
@@ -721,6 +761,7 @@ function buildDog(breed, stage, voidLook) {
   return { root, sc, body: bodyG, head: headG, legs, tail: tailG, tongue, legH, r, S0, baseY: bodyG.position.y, bodyY: (legH + r * 0.75) * S0 };
 }
 function animDog(m, a, dt) {
+  if (m.glb) return animModelDog(m, a, dt);
   const sp = a.speed || 0;
   a.phase = (a.phase || 0) + dt * (sp * 5.2 / Math.max(0.5, m.S0) + (a.swim ? 6 : 0));
   let amp = Math.min(0.85, sp * 0.24 / Math.max(0.6, m.S0)); if (a.swim) amp = 0.75;
@@ -734,6 +775,23 @@ function animDog(m, a, dt) {
   m.head.rotation.x = Math.sin(ph * 0.5) * 0.05 * amp - (a.lookUp || 0);
   m.head.rotation.y = Math.sin(t * 0.7 + (a.seed || 0)) * 0.25 * (1 - amp);
   m.tongue.visible = sp > 1.5 || !!a.happy;
+  m.sc.rotation.z = faint * 1.45; m.sc.position.y = -faint * 0.05;
+}
+
+function animModelDog(m, a, dt) {
+  const sp = a.speed || 0, lie = a.lieK || 0, faint = a.faintK || 0, t = a.t || 0;
+  a.phase = (a.phase || 0) + dt * (sp * 5.2 / Math.max(0.5, m.S0) + (a.swim ? 6 : 0));
+  if (m.mixer) {
+    const w = a.swim ? 1 : clamp(sp / 1.2, 0, 1) * (1 - lie);
+    m.walk.setEffectiveWeight(w);
+    m.walk.timeScale = a.swim ? 1.6 : clamp(sp / 1.6, 0.6, 3.2);
+    m.mixer.update(dt);
+  }
+  if (lie > 0.01) { const fold = [-1.35, -1.35, 1.35, 1.35]; m.legs.forEach((l, i) => { l.rotation.x = lerp(l.rotation.x, fold[i], lie); }); }
+  m.body.position.y = Math.abs(Math.sin(a.phase)) * 0.02 * clamp(sp / 3, 0, 1) - lie * m.legH * 0.8 + (a.hop || 0);
+  m.body.rotation.x = a.swim ? -0.18 : 0;
+  m.tail.rotation.y = Math.sin(t * (a.happy ? 13 : 7)) * (a.happy ? 0.6 : 0.3);
+  m.ears.forEach((e, i) => { e.rotation.z = Math.sin(t * 9 + i * 2) * 0.06 * clamp(sp / 3, 0.2, 1); });
   m.sc.rotation.z = faint * 1.45; m.sc.position.y = -faint * 0.05;
 }
 
@@ -1791,6 +1849,7 @@ function start(hot) {
   run = S.run && S.run.seed ? S.run : null;
   if (S.started && !S.shop.length) rollShop();
   applyQuality();
+  loadModels();
   if (run) enterRunWorld(); else enterHome();
   renderUI();
   const l = document.getElementById('loading'); if (l) l.remove();
