@@ -666,9 +666,10 @@ function glowSprite(color, s, op = 0.7) { const sp = new THREE.Sprite(new THREE.
 // =====================================================================
 // DOG MODEL
 // =====================================================================
-// Imported 3D models (GLB). Breeds without one use the procedural builder below.
+// Imported 3D models (GLB). Breeds and props without one use the built-in builders.
 const MODEL_FILES = { goldendoodle: 'models/goldendoodle.glb' };
-const MODELS = {};
+const PROP_FILES = { chest: 'models/treasure_chest.glb' };
+const MODELS = {}, PROPS = {};
 function loadModels() {
   if (!THREE.GLTFLoader) return;
   const loader = new THREE.GLTFLoader();
@@ -676,22 +677,49 @@ function loadModels() {
   const fetchModel = url => fetch(url).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
     .catch(() => fetch(url + '.json').then(r => { if (!r.ok) throw new Error('no model file'); return r.json(); })
       .then(j => { const bin = atob(j.data), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }));
+  const prepare = gltf => {
+    const toS = x => x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(x, 1 / 2.4) - 0.055, seen = new Set();
+    gltf.scene.traverse(o => {
+      if (!o.isMesh) return;
+      o.castShadow = true; o.receiveShadow = true; o.geometry.userData.shared = true;
+      // glTF stores linear colours; this game renders in display space, so convert once
+      const col = o.geometry.attributes.color;
+      if (col && !seen.has(col)) { seen.add(col); for (let i = 0; i < col.count; i++) col.setXYZ(i, toS(col.getX(i)), toS(col.getY(i)), toS(col.getZ(i))); col.needsUpdate = true; }
+      for (const m of [].concat(o.material)) {
+        if (seen.has(m)) continue; seen.add(m);
+        m.color.convertLinearToSRGB(); if (m.map) { m.map.encoding = THREE.LinearEncoding; m.map.needsUpdate = true; }
+        // no environment map in this world, so true metals would render black; keep a hint of sheen instead
+        if (m.metalness > 0.2) { m.metalness = 0.15; m.roughness = Math.min(m.roughness, 0.45); }
+        m.envMapIntensity = 0; m.needsUpdate = true;
+      }
+    });
+    return gltf;
+  };
+  const load = url => fetchModel(url).then(buf => new Promise((res, rej) => loader.parse(buf, '', res, rej))).then(prepare);
   for (const [breed, url] of Object.entries(MODEL_FILES)) {
-    fetchModel(url).then(buf => new Promise((res, rej) => loader.parse(buf, '', res, rej))).then(gltf => {
-      const toS = x => x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(x, 1 / 2.4) - 0.055, seen = new Set();
-      gltf.scene.traverse(o => {
-        if (!o.isMesh) return;
-        o.castShadow = true; o.receiveShadow = true; o.geometry.userData.shared = true;
-        // glTF stores linear colours; this game renders in display space, so convert once
-        const col = o.geometry.attributes.color;
-        if (col && !seen.has(col)) { seen.add(col); for (let i = 0; i < col.count; i++) col.setXYZ(i, toS(col.getX(i)), toS(col.getY(i)), toS(col.getZ(i))); col.needsUpdate = true; }
-        for (const m of [].concat(o.material)) { if (seen.has(m)) continue; seen.add(m); m.color.convertLinearToSRGB(); if (m.map) { m.map.encoding = THREE.LinearEncoding; m.map.needsUpdate = true; } m.envMapIntensity = 0; m.needsUpdate = true; }
-      });
+    load(url).then(gltf => {
       MODELS[breed] = { scene: gltf.scene, clip: gltf.animations[0] || null };
       for (const k of Object.keys(portraitCache)) if (k.startsWith(breed)) delete portraitCache[k];
       actorSig = ''; if (S && S.started && world) syncActors();
       renderUI();
     }).catch(err => console.warn('Model not loaded, using built-in dog for', breed, err && err.message));
+  }
+  for (const [name, url] of Object.entries(PROP_FILES)) {
+    load(url).then(gltf => { PROPS[name] = { scene: gltf.scene, clips: gltf.animations }; if (world) upgradeProps(); })
+      .catch(err => console.warn('Prop not loaded, using built-in', name, err && err.message));
+  }
+}
+// Put an imported prop inside an item's group; returns true when a model was used
+function propInto(name, it, inner, scale) {
+  const P = PROPS[name]; if (!P) return false;
+  const obj = P.scene.clone(true); obj.scale.setScalar(scale); inner.add(obj);
+  if (P.clips.length) { const mixer = new THREE.AnimationMixer(obj); it.mixer = mixer; it.clips = Object.fromEntries(P.clips.map(c => [c.name, c])); }
+  return true;
+}
+function upgradeProps() {
+  for (const it of world.items) {
+    if (it.gone || it.t !== 'chest' || it.mixer || !PROPS.chest) continue;
+    const inner = it.obj.userData.inner; inner.clear(); propInto('chest', it, inner, 1.25);
   }
 }
 function buildDogFromModel(breed, stage) {
@@ -1119,9 +1147,11 @@ function itemMesh(it, R) {
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) part(sphereGeo(), bone, 0.12, 0.12, 0.12, sx * 0.3, 0, sz * 0.08, inner);
     inner.position.y = 0.9; grp.add(at(glowSprite('#fff3c4', 1.6, 0.5), 0, 0.9, 0));
   } else if (it.t === 'chest') {
-    const wood = coatMat('#8a5a2b', { fur: 0.8 }), gold = coatMat('#d9a63a', { fur: 0.3 });
-    part(boxGeo(), wood, 0.95, 0.55, 0.62, 0, 0.3, 0, inner); part(boxGeo(), wood, 1.0, 0.22, 0.66, 0, 0.68, 0, inner);
-    part(boxGeo(), gold, 1.02, 0.08, 0.68, 0, 0.56, 0, inner); part(boxGeo(), gold, 0.14, 0.18, 0.05, 0, 0.5, 0.34, inner);
+    if (!propInto('chest', it, inner, 1.25)) {
+      const wood = coatMat('#8a5a2b', { fur: 0.8 }), gold = coatMat('#d9a63a', { fur: 0.3 });
+      part(boxGeo(), wood, 0.95, 0.55, 0.62, 0, 0.3, 0, inner); part(boxGeo(), wood, 1.0, 0.22, 0.66, 0, 0.68, 0, inner);
+      part(boxGeo(), gold, 1.02, 0.08, 0.68, 0, 0.56, 0, inner); part(boxGeo(), gold, 0.14, 0.18, 0.05, 0, 0.5, 0.34, inner);
+    }
     inner.rotation.y = R() * 6; grp.add(at(glowSprite('#ffd36b', 2.2, 0.45), 0, 0.6, 0));
   } else if (it.t === 'gem') {
     const gm = new THREE.MeshLambertMaterial({ color: '#9a5cff', emissive: '#5a1fb0' }), oct = GEO.oct || (GEO.oct = shared(new THREE.OctahedronGeometry(1, 0)));
@@ -1331,7 +1361,9 @@ function updateVisuals(dt) {
     if (o.root.userData.dog) { m.anim = m.anim || { t: 0, seed: 2, phase: 0 }; m.anim.t += dt; m.anim.speed = B ? 0.5 : 3; animDog(o.root.userData.dog, m.anim, dt); }
   }
   for (const it of world.items) {
-    if (it.gone) continue; const inner = it.obj.userData.inner;
+    if (it.mixer) it.mixer.update(dt);
+    if (it.gone) { if (it.hideT > 0 && (it.hideT -= dt) <= 0) it.obj.visible = false; continue; }
+    const inner = it.obj.userData.inner;
     if (it.t === 'treat' || it.t === 'gem') { inner.rotation.y += dt * 1.5; inner.position.y = (it.t === 'treat' ? 0.9 : 0) + Math.sin(U.uTime.value * 2 + it.x) * 0.12; }
     if (it.obj.userData.dog) { const act = it.obj.userData.act; act.t += dt; animDog(it.obj.userData.dog, act, dt); it.obj.userData.heart.position.y = 1.5 + Math.sin(act.t * 3) * 0.1; inner.rotation.y = Math.atan2(player.x - it.x, player.z - it.z); }
   }
@@ -1450,7 +1482,9 @@ function startRun() {
   toast('Follow the trail to the Rift Gate. Watch for void monsters!');
 }
 function pickupItem(it) {
-  it.gone = true; run.taken[it.id] = 1; it.obj.visible = false;
+  it.gone = true; run.taken[it.id] = 1;
+  if (it.mixer && it.clips && it.clips.Open) { const act = it.mixer.clipAction(it.clips.Open); act.setLoop(THREE.LoopOnce); act.clampWhenFinished = true; act.play(); it.hideT = 2.2; }
+  else it.obj.visible = false;
   const corgi = partyDogs().some(d => d.breed === 'corgi') ? 1.3 : 1, dm = 1 + 0.35 * (run.depth - 1), y = groundY(it.x, it.z) + 1.4;
   if (it.t === 'treat') { const n = rint(1, 2); run.loot.treats += n; popup(`+${n} treat${n > 1 ? 's' : ''}`, it.x, y, it.z, 'good'); burst(it.x, y, it.z, '#fff3c4', 8); }
   else if (it.t === 'chest') { const n = Math.round(rint(12, 24) * dm * corgi), tr = Math.random() < 0.4 ? 1 : 0; run.loot.coins += n; run.loot.treats += tr; popup(`+${n} coins`, it.x, y, it.z, 'good'); burst(it.x, y, it.z, '#ffd36b', 14); toast(`Dug up a buried chest: ${n} coins${tr ? ' and a treat' : ''}!`); }

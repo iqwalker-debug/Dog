@@ -35,6 +35,7 @@ Puppies **don't always listen**. Bond and training improve that.
 ## Imported 3D models
 - Breeds listed in `MODEL_FILES` (in `index.html`) load a GLB model from `models/`. Every other breed uses the built-in dog builder.
 - Imported models can have named leg joints (`FrontLeft_UpperLeg` and so on), a `Tail` and ears, plus a walk animation that speeds up with movement.
+- `models/treasure_chest.glb` was made with ChatGPT (honey-oak wood, iron bands, brass lock). Its lid opens with the model's own `Open` animation when you collect it.
 - `models/goldendoodle.glb` was made with ChatGPT, then slimmed with gltf-transform from 18.7 MB / 362k triangles down to 3.2 MB / 114k triangles.
 - `vendor/GLTFLoader.js` is three.js's model loader, wrapped so it works with the page's single copy of three.js.
 - Opening `index.html` straight from disk can't load models, so it falls back to the built-in dogs. Serve the folder instead, for example with `python3 -m http.server`.
