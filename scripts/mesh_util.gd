@@ -148,11 +148,16 @@ static func vcolor_mat(roughness := 0.9, mult := Color.WHITE) -> ShaderMaterial:
 	return m
 
 
+## Poly Haven CC0 scans: name -> texture set in res://textures/<set>_{diff,nor_gl}_1k.jpg
 const DETAIL := {
-	"boulder": "res://textures/rock_boulder_dry_diff_1k.jpg",
-	"riverbed": "res://textures/dry_riverbed_rock_diff_1k.jpg",
-	"forest": "res://textures/forest_ground_04_diff_1k.jpg",
-	"pebbles": "res://textures/river_small_rocks_diff_1k.jpg",
+	"boulder": "rock_boulder_dry",
+	"riverbed": "dry_riverbed_rock",
+	"forest": "forest_ground_04",
+	"pebbles": "river_small_rocks",
+	"trail": "rocky_trail",
+	"grassy": "sparse_grass",
+	"bark": "bark_brown_02",
+	"cliff": "rock_face_03",
 }
 
 
@@ -165,9 +170,14 @@ static func ground_mat(detail := "", scale := 0.35, strength := 0.85, caustics :
 	m.set_shader_parameter("roughness_v", roughness)
 	m.set_shader_parameter("caustics", caustics)
 	if detail != "":
-		m.set_shader_parameter("detail_tex", load(DETAIL[detail]))
+		var set_name: String = DETAIL[detail]
+		m.set_shader_parameter("detail_tex", load("res://textures/%s_diff_1k.jpg" % set_name))
 		m.set_shader_parameter("detail_scale", scale)
 		m.set_shader_parameter("detail_strength", strength)
+		var nor := "res://textures/%s_nor_gl_1k.jpg" % set_name
+		if ResourceLoader.exists(nor):
+			m.set_shader_parameter("detail_normal", load(nor))
+			m.set_shader_parameter("normal_strength", 0.55)
 	return m
 
 

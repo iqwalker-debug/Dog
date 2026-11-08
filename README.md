@@ -23,11 +23,13 @@ godot --path . -- --level=trail
 | Shift | run |
 | Space | splash (swimming) · call the dogs (trail) |
 | F or double-click | throw the ball (fetch race) |
+| B | bark (a buddy answers) |
 | E | shake off |
 | C | sit → lie → auto |
 | 1 – 0 | swap your dog's breed |
 | L | next level |
 | V | trail: POV ↔ third person |
+| M | sound on / off |
 | F3 | FPS / internal-resolution overlay |
 
 ## Levels
@@ -45,5 +47,10 @@ Collect the 12 bone treats in each level; throw the ball and race your buddies t
 | `--scale=0.5` | force the internal 3D render scale (otherwise dynamic, 0.5–1.0, holding 60 fps) |
 | `--capture=shot.png --wait=6` | save a screenshot after N seconds, then quit |
 | `--walk` | autopilot (walks forward) — handy for capture tests |
+
+## Your own dog models
+
+Drop a rigged, animated `.glb` into `models/dogs/` (per breed, or `dog.glb` for all) and it replaces
+the procedural dog — see `models/dogs/README.md`.
 
 See `CLAUDE.md` for the architecture and roadmap.

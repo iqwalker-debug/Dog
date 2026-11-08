@@ -19,7 +19,7 @@ func _config() -> Dictionary:
 		"bounds": {"x0": -45, "x1": 46, "z0": -24, "z1": 30},
 		"start": {"x": -6.0, "z": 14.0, "heading": PI},
 		"player": "golden", "buddies": ["doodle", "lab"],
-		"help": "swim right to climb out",
+		"help": "climb out on the right",
 	}
 
 
@@ -37,16 +37,18 @@ func _build() -> void:
 	terrain({"w": 140.0, "d": 120.0, "seg": 1.3, "detail": "pebbles", "detail_scale": 0.35, "detail_strength": 0.7, "caustics": 1.0, "color": color})
 
 	# submerged limestone slabs
-	var rock_mat := MeshUtil.ground_mat("boulder", 0.5, 0.85, 0.5, Color("#c2ad62"), 0.95)
-	var rm := rock_mesh(1)
-	for i in 26:
-		var m := MeshUtil.mesh_instance(rm, self)
-		m.material_override = rock_mat
+	var place_slab := func(_i: int) -> Dictionary:
 		var x := -35.0 + r() * 55.0
 		var z := -20.0 + r() * 45.0
-		m.position = Vector3(x, ground_h(x, z) + 0.1, z)
-		m.rotation.y = r() * PI
-		m.scale = Vector3(2.0 + r() * 4.0, 0.5 + r() * 0.6, 1.5 + r() * 3.0)
+		return {"p": Vector3(x, ground_h(x, z) - 0.15, z), "s": Vector3(2.0 + r() * 3.0, 0.5 + r() * 0.6, 1.5 + r() * 2.5), "c": Color("#c9b87a")}
+	scan_scatter(26, place_slab, ["namaqualand_boulder_02", "namaqualand_boulder_05", "boulder_01"], true, 0.6)
+	# bank boulders on the sunny right side
+	var place_bank := func(_i: int) -> Dictionary:
+		var z := -24.0 + r() * 50.0
+		var x := 21.0 + r() * 8.0
+		var rad := 0.4 + r() * 1.2
+		return {"p": Vector3(x, ground_h(x, z) - 0.1, z), "s": Vector3(rad, rad * 0.8, rad), "c": Color("#ddd0ae")}
+	scan_scatter(30, place_bank)
 
 	# graffiti retaining wall + deck
 	var wall_mat := StandardMaterial3D.new()

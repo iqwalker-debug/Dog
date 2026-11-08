@@ -295,6 +295,56 @@ static func rock_mesh(detail := 1) -> Mesh:
 	return s
 
 
+const SCANS := ["boulder_01", "namaqualand_boulder_02", "namaqualand_boulder_04", "namaqualand_boulder_05", "rock_07", "rock_09", "stone_01"]
+static var _scan_mats := {}
+
+
+## Photoscanned rocks. names: which scans to mix (default all); place(i) -> {p, s: Vector3(radius_x,
+## height, radius_z), c: palette tint, rot?}. One MultiMesh per scan.
+func scan_scatter(n: int, place: Callable, names: Array = SCANS, cast := true, caustics := 0.0) -> void:
+	var groups := {}
+	for i in n:
+		var o: Dictionary = place.call(i)
+		var nm: String = names[int(rng.randf() * names.size()) % names.size()]
+		if not groups.has(nm):
+			groups[nm] = []
+		groups[nm].append(o)
+	for nm in groups:
+		var mesh: ArrayMesh = load("res://assets/scans/%s.res" % nm)
+		var h: float = mesh.get_meta("height", 1.0)
+		var list: Array = groups[nm]
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_colors = true
+		mm.mesh = mesh
+		mm.instance_count = list.size()
+		for k in list.size():
+			var o: Dictionary = list[k]
+			var s: Vector3 = o.s
+			var rot: Vector3 = o.get("rot", Vector3(0, rng.randf() * TAU, 0))
+			var b := Basis.from_euler(rot) * Basis.from_scale(Vector3(s.x, s.y / h, s.z))
+			mm.set_instance_transform(k, Transform3D(b, o.p))
+			mm.set_instance_color(k, o.get("c", Color("#d8ccb0")))
+		var mi := MultiMeshInstance3D.new()
+		mi.multimesh = mm
+		mi.material_override = _scan_mat(nm, caustics)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if cast else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(mi)
+
+
+static func _scan_mat(nm: String, caustics: float) -> ShaderMaterial:
+	var key := "%s/%s" % [nm, caustics]
+	if not _scan_mats.has(key):
+		var m := ShaderMaterial.new()
+		m.shader = preload("res://shaders/scan.gdshader")
+		m.set_shader_parameter("albedo_tex", load("res://assets/scans/%s_diff_1k.jpg" % nm))
+		m.set_shader_parameter("normal_tex", load("res://assets/scans/%s_nor_gl_1k.jpg" % nm))
+		m.set_shader_parameter("arm_tex", load("res://assets/scans/%s_arm_1k.jpg" % nm))
+		m.set_shader_parameter("caustics", caustics)
+		_scan_mats[key] = m
+	return _scan_mats[key]
+
+
 ## Wind-blown grass over a rectangle, in 12 m tiles that fade out with distance.
 ## where(x, z, y) -> Color: grass color there, or Color(0,0,0,0) for none (alpha = density 0..1).
 ## density = clumps per square meter at alpha 1; height in meters.

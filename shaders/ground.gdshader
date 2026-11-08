@@ -7,6 +7,8 @@ uniform vec4 base_color : source_color = vec4(1.0);
 uniform sampler2D detail_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float detail_scale = 0.35;   // texture repeats per meter
 uniform float detail_strength = 0.0; // 0..1
+uniform sampler2D detail_normal : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float normal_strength = 0.0; // 0 = flat
 uniform float caustics = 0.0;        // 0..1 animated light net
 uniform float roughness_v = 1.0;
 uniform vec4 emission_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
@@ -44,6 +46,15 @@ void fragment() {
 			+ texture(detail_tex, w_pos.xy * detail_scale).rgb * bw.z;
 		float lum = dot(tx, vec3(0.299, 0.587, 0.114));
 		col *= mix(1.0, clamp(lum / 0.42, 0.45, 1.6), detail_strength);
+		if (normal_strength > 0.0) {
+			// triplanar relief from the scanned normal map (world space, whiteout-ish blend)
+			vec2 nx = texture(detail_normal, w_pos.zy * detail_scale).rg * 2.0 - 1.0;
+			vec2 ny = texture(detail_normal, w_pos.xz * detail_scale).rg * 2.0 - 1.0;
+			vec2 nz = texture(detail_normal, w_pos.xy * detail_scale).rg * 2.0 - 1.0;
+			vec3 wn = normalize(w_nrm
+				+ (vec3(0.0, nx.y, nx.x) * bw.x + vec3(ny.x, 0.0, -ny.y) * bw.y + vec3(nz.x, nz.y, 0.0) * bw.z) * normal_strength);
+			NORMAL = normalize((VIEW_MATRIX * vec4(wn, 0.0)).xyz);
+		}
 	}
 	ALBEDO = col;
 	ROUGHNESS = roughness_v;

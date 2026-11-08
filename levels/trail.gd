@@ -18,6 +18,7 @@ var lateral := 0.0
 var speed := 0.0
 var autopilot := false
 var ground_mat: ShaderMaterial
+var _step_t := 0.0
 
 
 # ------------------------------------------------------------------ path (winds gently downhill)
@@ -91,7 +92,7 @@ func _ready() -> void:
 	glint = 1.0
 	setup_env(["#d8e6c8", 25, 95], Color("#7a7a45"), 300.0)
 	env.ambient_light_energy = 0.8
-	set_help("W/S walk · A/D drift · Shift brisk · V camera · Space call dogs · L next level · 1 swimming hole")
+	set_help("W/S walk · A/D drift · Shift brisk · V camera · Space call dogs · B bark · L next level · 1 swimming hole · M sound")
 	_build_ground()
 	_build_trees()
 	_build_scatter()
@@ -112,7 +113,7 @@ func _build_ground() -> void:
 		var d := path_dist(x, z)
 		var n := sin(x * 3.1) * cos(z * 2.7) * 0.5 + 0.5
 		return dirt.lerp(dirt_light, n * 0.6).lerp(litter, MeshUtil.ss(d, 1.0, 2.2) * 0.8).lerp(moss.lerp(under, n), MeshUtil.ss(d, 2.0, 4.5))
-	terrain({"w": 90.0, "d": 180.0, "cz": -68.0, "seg": 1.5, "detail": "forest", "detail_scale": 0.4, "detail_strength": 0.8, "color": color})
+	terrain({"w": 90.0, "d": 180.0, "cz": -68.0, "seg": 1.5, "detail": "trail", "detail_scale": 0.4, "detail_strength": 0.8, "color": color})
 
 
 func _build_trees() -> void:
@@ -143,8 +144,8 @@ func _build_scatter() -> void:
 	var place_rock := func(_i: int) -> Dictionary:
 		var p := on_path(r() * path_len, (-1.0 if r() < 0.5 else 1.0) * (1.2 + r() * 3.5) * (0.4 if r() < 0.15 else 1.0))
 		var rad := 0.12 + r() * r() * 0.7
-		return {"p": p + Vector3(0, rad * 0.2, 0), "s": Vector3(rad * 1.4, rad * 0.7, rad), "c": pick(rock_cols)}
-	scatter(rock_mesh(2), MeshUtil.ground_mat("boulder", 0.6, 0.85, 0.0, Color.WHITE, 0.95), 160, place_rock, true)
+		return {"p": p - Vector3(0, rad * 0.15, 0), "s": Vector3(rad * 1.4, rad * 0.9, rad), "c": pick(rock_cols)}
+	scan_scatter(160, place_rock)
 	# leaf litter
 	var litter_cols := [Color("#c4772f"), Color("#9b5b2a"), Color("#d8a33c"), Color("#7d5530"), Color("#e0b850")]
 	var leaf := PlaneMesh.new()
@@ -342,6 +343,10 @@ func _key(k: Key) -> void:
 	match k:
 		KEY_V:
 			third_person = not third_person
+		KEY_B:
+			if main and pack.size():
+				var d: Dog = pack[randi() % pack.size()].dog
+				main.sfx.play(d.bark_sound(), d.position, -3.0)
 		KEY_SPACE:
 			for d in pack:
 				d.sniffing = 0.0
@@ -382,6 +387,11 @@ func _process(delta: float) -> void:
 	wg.position = wp
 	wg.rotation.y = yaw
 	_person_update(walker, dt, absf(speed), true)
+	if absf(speed) > 0.3 and main and main.sfx:
+		_step_t -= dt * absf(speed)
+		if _step_t <= 0.0:
+			_step_t = 0.62
+			main.sfx.play("step_dirt", wp, -10.0)
 
 	# other walkers ahead, looping
 	for n in npcs:

@@ -245,7 +245,7 @@ static func _branch(p: Dictionary, r: RandomNumberGenerator, bark: Dictionary, l
 
 static func _bark() -> ShaderMaterial:
 	if not _bark_mat:
-		_bark_mat = MeshUtil.ground_mat("boulder", 1.2, 0.6, 0.0, Color("#d9c8b0"), 1.0)
+		_bark_mat = MeshUtil.ground_mat("bark", 1.4, 0.75, 0.0, Color("#e2d2bc"), 1.0)
 	return _bark_mat
 
 

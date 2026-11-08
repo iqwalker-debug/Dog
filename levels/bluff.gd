@@ -84,8 +84,8 @@ func _build() -> void:
 	var place_boulder := func(i: int) -> Dictionary:
 		var b := boulders[i]
 		var c: Color = pick(rock_cols)
-		return {"p": Vector3(b.x, b.base - b.h * 0.15, b.z), "s": Vector3(b.r * 1.02, b.h * 1.15, b.r * (0.8 + r() * 0.3)), "c": c * (1.0 + r() * 0.12)}
-	scatter(rock_mesh(2), MeshUtil.ground_mat("boulder", 0.45, 0.85), boulders.size() - 1, place_boulder, true)
+		return {"p": Vector3(b.x, b.base - 0.1, b.z), "s": Vector3(b.r * 1.05, b.h * 1.1, b.r * (0.85 + r() * 0.3)), "c": c * (1.0 + r() * 0.12)}
+	scan_scatter(boulders.size() - 1, place_boulder, ["boulder_01", "namaqualand_boulder_02", "namaqualand_boulder_04", "namaqualand_boulder_05", "stone_01"])
 	# pebbles across the bed
 	var peb_cols := [lime, grey, lime_warm]
 	var place_pebble := func(_i: int) -> Dictionary:
@@ -134,12 +134,6 @@ func _build() -> void:
 		var x := -45.0 + r() * 90.0
 		var z := 16.0 + r() * 8.0
 		forest.tree(Vector3(x, ground_h(x, z), z), 6.0 + r() * 3.0, 0.3)
-	# dry grass tufts in rock cracks
-	var place_tuft := func(_i: int) -> Dictionary:
-		var x := -45.0 + r() * 90.0
-		var z := -20.0 + r() * 34.0
-		return {"p": Vector3(x, ground_h(x, z), z), "s": Vector3(1, 0.6 + r(), 1), "c": Color("#c4ad62") if r() < 0.5 else Color("#9aa64e")}
-	scatter(_tuft(), MeshUtil.ground_mat(), 400, place_tuft)
 
 
 ## Box with jittered vertices: weathered limestone ledge.
@@ -159,16 +153,6 @@ func _jitter_box(w: float, h: float, d: float) -> ArrayMesh:
 	return MeshUtil.to_mesh(a)
 
 
-func _tuft() -> Mesh:
-	var c := CylinderMesh.new()
-	c.top_radius = 0.0
-	c.bottom_radius = 0.12
-	c.height = 0.35
-	c.radial_segments = 5
-	c.rings = 1
-	var a := MeshUtil.prim(c, Transform3D(Basis(), Vector3(0, 0.17, 0)))
-	return MeshUtil.to_mesh(a)
-
 
 func _grass_pass() -> void:
 	var where := func(x: float, z: float, y: float) -> Color:
@@ -178,3 +162,12 @@ func _grass_pass() -> void:
 		c.a = MeshUtil.ss(z, 13.0, 17.0)
 		return c
 	grass(Rect2(-55, 12, 110, 26), 9.0, where, 0.45)
+	# dry bunchgrass in the cracks of the creek bed
+	var dry := func(x: float, z: float, y: float) -> Color:
+		if z > 13.0 or z < -21.0:
+			return Color(0, 0, 0, 0)
+		var n := sin(x * 1.7 + z * 0.9) * cos(x * 0.4 - z * 1.3)
+		var c := Color("#c4ad62").lerp(Color("#9aa64e"), sin(x * 0.3) * 0.5 + 0.5)
+		c.a = clampf(n * 1.6 - 0.6, 0.0, 1.0) * 0.6
+		return c
+	grass(Rect2(-45, -21, 90, 34), 4.0, dry, 0.35)

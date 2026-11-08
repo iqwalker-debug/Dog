@@ -22,6 +22,7 @@ var scale_3d := 0.75
 var fps_acc := 0.0
 var fps_frames := 0
 var capture_t := -1.0
+var sfx: Sounds
 
 
 func _ready() -> void:
@@ -34,6 +35,8 @@ func _ready() -> void:
 	get_viewport().scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
 	get_viewport().scaling_3d_scale = scale_3d
 	_build_ui()
+	sfx = Sounds.new()
+	add_child(sfx)
 	if args.has("capture"):
 		capture_t = float(args.get("wait", "8"))
 	if args.has("showroom"):
@@ -109,6 +112,7 @@ func load_level(name: String) -> void:
 	score_label.text = ""
 	toast_label.text = ""
 	(post.material as ShaderMaterial).set_shader_parameter("glint", level.glint)
+	sfx.set_ambience("swimhole" if name == "showroom" else name)
 	if args.has("breed") and level is World:
 		level.swap_breed(args.breed)
 
@@ -155,6 +159,8 @@ func set_debug(text: String) -> void:
 func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventKey and e.pressed and not e.echo and e.physical_keycode == KEY_F3:
 		debug_label.visible = not debug_label.visible
+	if e is InputEventKey and e.pressed and not e.echo and e.physical_keycode == KEY_M:
+		toast("Sound off" if sfx.toggle_mute() else "Sound on")
 
 
 func _process(delta: float) -> void:

@@ -74,6 +74,14 @@ var sit_b := 0.0
 var lie_b := 0.0
 var sniffing := false
 var sniff_b := 0.0
+var look_target = null # Vector3 world point to watch (ball, the player), or null
+var _prev_yaw := 0.0
+var _yaw_rate := 0.0
+var _gallop := 0.0
+const GAIT_WALK := [0.0, PI, PI * 0.5, PI * 1.5] # lateral sequence: LF, RF, LH, RH
+const GAIT_TROT := [0.0, PI, PI, 0.0]            # diagonal pairs
+const GAIT_GALLOP := [0.0, 0.55, PI + 0.2, PI + 0.75] # rotary gallop: fronts then hinds
+var shook := false # set when a shake starts (for sound); the level clears it
 var wag_base := 0.0
 var eye_x := 0.0
 var eye_y := 0.0
@@ -114,7 +122,11 @@ func _init(key := "golden") -> void:
 	fur_mat = Fur.material(B.curl, dens, 0.25)
 	tail_mat = Fur.material(B.curl, dens, 0.6)
 	shells = mini(32, int(B.shells * 1.5))
-	_build()
+	var model := model_path(breed)
+	if model != "":
+		_build_model(model)
+	else:
+		_build()
 
 
 func _tint(p: Vector3, part: String) -> Color:
@@ -377,6 +389,132 @@ func _build() -> void:
 	_d_life.resize(DROPS)
 
 
+# ------------------------------------------------------------------ artist models (optional)
+
+## A rigged, animated model dropped in res://models/dogs/<breed>.glb (or dog.glb for every breed)
+## replaces the procedural dog. See models/dogs/README.md.
+var model_anim: AnimationPlayer
+var model_root: Node3D
+var _model_anims := {}
+
+const ANIM_ALIASES := {
+	"idle": ["idle", "stand", "breath"], "walk": ["walk"], "trot": ["trot", "jog"],
+	"run": ["gallop", "run", "sprint"], "swim": ["swim", "paddle"], "sit": ["sit"],
+	"lie": ["lie", "lay", "rest", "sleep"], "shake": ["shake"], "sniff": ["sniff", "eat", "smell"],
+}
+
+
+static func model_path(key: String) -> String:
+	for p in ["res://models/dogs/%s.glb" % key, "res://models/dogs/%s.gltf" % key, "res://models/dogs/dog.glb"]:
+		if ResourceLoader.exists(p):
+			return p
+	return ""
+
+
+func _build_model(path: String) -> void:
+	rig = _node(self)
+	var scene: PackedScene = load(path)
+	model_root = scene.instantiate()
+	rig.add_child(model_root)
+	# fit: put the paws on the ground, scale to this breed's height (legH + ~0.45 body)
+	var aabb := _model_aabb(model_root)
+	var want_h: float = B.legH + 0.42 * S
+	var s := want_h / maxf(aabb.size.y, 0.01)
+	model_root.scale = Vector3.ONE * s
+	model_root.position = Vector3(-aabb.get_center().x * s, -aabb.position.y * s - B.legH, -aabb.get_center().z * s)
+	model_anim = model_root.find_child("AnimationPlayer", true, false)
+	if model_anim:
+		for want in ANIM_ALIASES:
+			for a in model_anim.get_animation_list():
+				var low := String(a).to_lower()
+				for alias in ANIM_ALIASES[want]:
+					if low.contains(alias) and not _model_anims.has(want):
+						_model_anims[want] = a
+	# head / jaw / neck stand-ins so the rest of the game (ball carry, camera) still works
+	neck = _node(rig, Vector3(0, 0.4, 0.64))
+	head = _node(neck)
+	jaw = _node(head, Vector3(0, -0.065, 0.02))
+	nose = _node(head)
+	tongue = _node(jaw)
+	tail_root = _node(rig)
+	drops = MultiMeshInstance3D.new()
+	drops.top_level = true
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = _drop_mesh
+	mm.instance_count = DROPS
+	mm.visible_instance_count = 0
+	drops.multimesh = mm
+	add_child(drops)
+	_d_pos.resize(DROPS)
+	_d_vel.resize(DROPS)
+	_d_life.resize(DROPS)
+
+
+static func _model_aabb(n: Node) -> AABB:
+	var out := AABB()
+	var first := true
+	for c in n.find_children("*", "VisualInstance3D", true, false):
+		var vi := c as VisualInstance3D
+		var bb := vi.get_global_transform() * vi.get_aabb() if vi.is_inside_tree() else vi.transform * vi.get_aabb()
+		out = bb if first else out.merge(bb)
+		first = false
+	return out
+
+
+func _update_model(dt: float, speed: float, in_water: bool, ground_y: float, water_y: float) -> void:
+	t += dt
+	mode = "swim" if in_water else "land"
+	var run := minf(absf(speed) / 5.0, 1.0)
+	if in_water:
+		wet = minf(1.0, wet + dt * 2.0)
+		land_time = 0.0
+		position.y = lerpf(position.y, water_y + 0.1, _damp(dt, 6.0))
+	else:
+		land_time += dt
+		if land_time > 0.5 and land_time < 0.6 and wet > 0.6:
+			shake()
+		wet = maxf(0.0, wet - dt * (0.6 if shake_t > 0.0 else 0.02))
+		position.y = lerpf(position.y, ground_y + B.legH, _damp(dt, 10.0))
+		idle = idle + dt if absf(speed) < 0.2 else 0.0
+		pose = ("lie" if idle > 12.0 else ("sit" if idle > 4.0 else "stand")) if pose_mode == "auto" else pose_mode
+		if absf(speed) > 0.3:
+			pose = "stand"
+	var want := "idle"
+	if shake_t > 0.0:
+		want = "shake"
+		if wet > 0.05:
+			_emit_drops(ceili(dt * 160.0 * wet), 3.5)
+		shake_t -= dt
+	elif in_water:
+		want = "swim"
+	elif absf(speed) > 0.3:
+		want = "run" if run > 0.7 else ("trot" if run > 0.35 else "walk")
+	elif sniffing:
+		want = "sniff"
+	elif pose == "sit" or pose == "lie":
+		want = pose
+	if model_anim:
+		var name: String = _model_anims.get(want, _model_anims.get("walk" if want in ["trot", "run"] else "idle", ""))
+		if name != "" and model_anim.current_animation != name:
+			model_anim.play(name, 0.25)
+		model_anim.speed_scale = clampf(absf(speed) / (1.2 + run * 3.0), 0.6, 2.0) if want in ["walk", "trot", "run"] else 1.0
+	if _d_alive:
+		var mm := drops.multimesh
+		var alive := 0
+		for i in DROPS:
+			if _d_life[i] <= 0.0:
+				continue
+			_d_vel[i].y -= 9.8 * dt
+			_d_pos[i] += _d_vel[i] * dt
+			_d_life[i] -= dt * 1.2
+			if _d_life[i] > 0.0:
+				mm.set_instance_transform(alive, Transform3D(Basis(), _d_pos[i]))
+				alive += 1
+		mm.visible_instance_count = alive
+		_d_alive = alive > 0
+
+
 ## ring in the XY plane (like THREE.TorusGeometry(1, tube)), scaled by its node
 static func _torus(tube: float, radial: int, tubular: int) -> ArrayMesh:
 	var key := "torus%.3f" % tube
@@ -401,6 +539,12 @@ func splash() -> void:
 func shake() -> void:
 	if shake_t <= 0.0:
 		shake_t = 1.1
+		shook = true
+
+
+## Which bark suits this dog's size.
+func bark_sound() -> String:
+	return "bark_small" if S < 0.8 else ("bark_big" if S > 1.0 else "bark")
 
 
 ## 'auto' (sits after 4s idle, lies down after 12s), 'stand', 'sit', 'lie'
@@ -428,6 +572,8 @@ func collar_world() -> Vector3:
 
 ## fur LOD: 24 = full shells, fewer when far from the camera
 func set_fur_detail(k: int) -> void:
+	if model_root:
+		return
 	var use := ceili(k / 24.0 * shells)
 	var frac := float(clampi(use, 1, shells)) / shells + 0.001
 	fur_mat.set_shader_parameter("max_shell", frac)
@@ -452,6 +598,9 @@ static func _damp(dt: float, rate: float) -> float:
 
 ## speed: forward speed (m/s); in_water: swimming; ground_y / water_y: heights under the dog
 func update(dt: float, speed: float, in_water := true, ground_y := -1.4, water_y := 0.0) -> void:
+	if model_root:
+		_update_model(dt, speed, in_water, ground_y, water_y)
+		return
 	t += dt
 	var run := minf(absf(speed) / 5.0, 1.0)
 	mode = "swim" if in_water else "land"
@@ -487,16 +636,23 @@ func update(dt: float, speed: float, in_water := true, ground_y := -1.4, water_y
 		position.y = lerpf(position.y, ground_y + leg_h, _damp(dt, 10.0))
 		gait += dt * (3.0 + absf(speed) * 2.6 / maxf(S, 0.6))
 		var move := minf(1.0, absf(speed) * 2.0)
-		var swing := (0.25 + run * 0.55) * move
-		for l in legs:
-			var ph: float = gait + l.phase
+		# gait blends with speed: walk -> trot -> gallop
+		var trot_b := MeshUtil.ss(run, 0.25, 0.5)
+		_gallop = lerpf(_gallop, MeshUtil.ss(run, 0.65, 0.9), _damp(dt, 3.0))
+		var swing := (0.25 + run * 0.55 + _gallop * 0.25) * move
+		for i in legs.size():
+			var l := legs[i]
+			var phase: float = lerpf(lerpf(GAIT_WALK[i], GAIT_TROT[i], trot_b), GAIT_GALLOP[i], _gallop)
+			var ph: float = gait + phase
 			var hip: Node3D = l.hip
 			var knee: Node3D = l.knee
 			hip.rotation.x = l.restU + sin(ph) * swing
 			var lift := maxf(0.0, sin(ph + 1.2)) * (0.5 + run * 0.6) * move
 			knee.rotation.x = l.restK + (lift if l.front else -lift)
-		rig.position.y = absf(sin(gait)) * 0.04 * run
-		rig.rotation.x = sin(gait * 2.0) * 0.03 * run
+		# body: gentle bob at a walk, diagonal bounce at a trot, rocking-horse back at a gallop
+		rig.position.y = absf(sin(gait)) * 0.04 * run * (1.0 - _gallop) + (sin(gait) * 0.5 + 0.5) * 0.07 * _gallop * S
+		rig.rotation.x = sin(gait * 2.0) * 0.03 * run * (1.0 - _gallop) + sin(gait + 0.6) * 0.13 * _gallop
+		rig.rotation.y = sin(gait) * 0.035 * move * (1.0 - _gallop) # hips sway side to side
 		wag_speed = 8.0 + run * 6.0
 		wag_amp = 0.55
 		tail_lift = 0.15
@@ -556,6 +712,24 @@ func update(dt: float, speed: float, in_water := true, ground_y := -1.4, water_y
 		rig.rotation.z = sin(t * 1.7) * 0.04 if in_water else 0.0
 		neck.rotation.z = 0.0
 		tail_root.rotation.z = 0.0
+
+	# lean into turns; head leads the turn, then looks at what the dog cares about
+	var yaw := rotation.y
+	var dyaw := wrapf(yaw - _prev_yaw, -PI, PI)
+	_prev_yaw = yaw
+	_yaw_rate = lerpf(_yaw_rate, dyaw / maxf(dt, 1e-4), _damp(dt, 6.0))
+	if shake_t <= 0.0:
+		rig.rotation.z += clampf(-_yaw_rate * 0.06 * (0.3 + run), -0.22, 0.22)
+	var look_yaw := clampf(_yaw_rate * 0.18, -0.45, 0.45)
+	var look_pitch := 0.0
+	if look_target != null and sniff_b < 0.3:
+		var lp: Vector3 = to_local(look_target)
+		var want_yaw := clampf(atan2(lp.x, lp.z), -0.9, 0.9)
+		var flat := Vector2(lp.x, lp.z).length()
+		look_yaw = want_yaw if flat > 0.4 else look_yaw
+		look_pitch = clampf(-atan2(lp.y - 0.5, maxf(flat, 0.1)), -0.5, 0.4)
+	neck.rotation.y = lerpf(neck.rotation.y, look_yaw, _damp(dt, 5.0))
+	neck.rotation.x += look_pitch * (1.0 - sniff_b) * 0.6
 
 	# jaw, tongue, blink, happy squint
 	jaw.rotation.x = lerpf(jaw.rotation.x, mouth_open, _damp(dt, 10.0))

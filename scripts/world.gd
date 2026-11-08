@@ -19,6 +19,10 @@ var heading := 0.0
 var speed := 0.0
 var ripples: Array[Dictionary] = []
 var autopilot := false # --walk: drive forward on a gentle curve (for testing)
+var _step_t := 0.0
+var _paddle_t := 0.0
+var _pant_t := 0.0
+var _bark_reply := -1.0
 
 static var _ripple_mesh: ArrayMesh
 static var _bone_mat: StandardMaterial3D
@@ -61,7 +65,7 @@ func _ready() -> void:
 	_spawn_dogs()
 	_spawn_treats()
 	_make_ball()
-	set_help("%s · WASD/drag · Shift run · Space splash · F throw ball · E shake · C sit · L next level · 1-0 breeds%s"
+	set_help("%s · WASD move · Shift run · Space splash · F fetch · B bark · E shake · C sit · L level · 1-0 breed · M mute%s"
 		% [cfg.get("name", ""), (" · " + cfg.help) if cfg.has("help") else ""])
 	_score()
 	snap_camera()
@@ -155,6 +159,11 @@ func _ripple(x: float, z: float, k := 1.0) -> void:
 	ripples.append({"m": m, "mat": mat, "t": 0.0, "k": k})
 
 
+func _sfx(name: String, pos = null, db := 0.0) -> void:
+	if main and main.sfx:
+		main.sfx.play(name, pos, db)
+
+
 func _toast(msg: String) -> void:
 	if main:
 		main.toast(msg)
@@ -183,6 +192,10 @@ func _key(k: Key) -> void:
 				for i in 3:
 					_ripple(dog.position.x, dog.position.z, 1.6)
 				dog.splash()
+				_sfx("splash_big", dog.position, -2.0)
+		KEY_B:
+			_sfx(dog.bark_sound(), dog.position, -1.0)
+			_bark_reply = 0.5 + randf() * 0.6
 	if k >= KEY_0 and k <= KEY_9:
 		swap_breed(Breeds.ORDER[(int(k - KEY_0) + 9) % 10])
 
@@ -217,6 +230,7 @@ func throw_ball() -> void:
 	var dist := 9.0 + randf() * 6.0
 	var a := heading + (randf() - 0.5) * 0.5
 	ball_v = Vector3(sin(a) * dist * 0.55, 6, cos(a) * dist * 0.55)
+	_sfx("whoosh", ball.position, -4.0)
 	_toast("Fetch! 🎾")
 
 
@@ -240,7 +254,34 @@ func step_dog(d: Dog, dt: float, spd: float) -> bool:
 	d.update(dt, spd, swim, gy, water_y if water_y != null else 0.0)
 	if swim and randf() < dt * (1 + absf(spd)):
 		_ripple(p.x, p.z, 0.7)
+	if d.shook:
+		d.shook = false
+		_sfx("shake", d.position, -3.0 if d == dog else -9.0)
+	if d == dog:
+		_dog_sounds(dt, spd, swim, depth)
 	return swim
+
+
+## Paws, paddling and panting for the player's dog.
+func _dog_sounds(dt: float, spd: float, swim: bool, depth: float) -> void:
+	var p := dog.position
+	var mv := absf(spd)
+	if swim:
+		_paddle_t -= dt
+		if _paddle_t <= 0.0 and mv > 0.2:
+			_paddle_t = 0.42
+			_sfx("paddle", p, -10.0)
+		return
+	if mv > 0.3:
+		_step_t -= dt * (1.0 + mv * 0.45)
+		if _step_t <= 0.0:
+			_step_t = 0.3
+			_sfx("step_water" if depth > 0.05 else "step_dirt", p, -12.0 if depth > 0.05 else -16.0)
+	_pant_t -= dt
+	if _pant_t <= 0.0:
+		_pant_t = 0.5 / (1.0 + minf(mv / 4.0, 1.0) * 0.6)
+		if dog.pose != "lie":
+			_sfx("pant", p + Vector3(0, 0.4, 0), -20.0 + minf(mv, 4.0) * 1.2)
 
 
 func _process(delta: float) -> void:
@@ -273,6 +314,7 @@ func _process(delta: float) -> void:
 	else:
 		speed *= 0.4
 	dog.rotation.y = heading
+	dog.look_target = ball.position if (ball_state == "flying" or ball_state == "down") else null
 	step_dog(dog, dt, speed)
 	p = dog.position
 
@@ -313,13 +355,22 @@ func _process(delta: float) -> void:
 		if v > 0.2:
 			b.heading = atan2(b.vel.x, b.vel.z)
 		bd.rotation.y = b.heading
+		bd.look_target = ball.position if (ball_state == "flying" or ball_state == "down") else dog.position + Vector3(0, 0.4, 0)
 		step_dog(bd, dt, v)
 		# buddy drops the ball at your feet
 		if carrier == bd and dist < 1.4:
 			carrier = null
 			ball.position = Vector3(bd.position.x, ground_h(bd.position.x, bd.position.z) + 0.06, bd.position.z)
 			ball_state = "atFeet"
+			_sfx(bd.bark_sound(), bd.position, -3.0)
 			_toast("%s brought it back!" % bd.dog_name)
+
+	# a buddy answers your bark
+	if _bark_reply > 0.0:
+		_bark_reply -= dt
+		if _bark_reply <= 0.0 and buddies.size():
+			var bd: Dog = buddies[randi() % buddies.size()].dog
+			_sfx(bd.bark_sound(), bd.position, -4.0)
 
 	# ball physics + pickup
 	if ball_state == "flying":
@@ -330,6 +381,8 @@ func _process(delta: float) -> void:
 			ball.position.y = floor_y
 			ball_state = "down"
 			_ripple(ball.position.x, ball.position.z, 1.2)
+			var wet_landing: bool = water_y != null and ground_h(ball.position.x, ball.position.z) < water_y
+			_sfx("splash" if wet_landing else "thud", ball.position, -4.0)
 	if ball_state == "down" or ball_state == "atFeet":
 		if water_y != null and ground_h(ball.position.x, ball.position.z) < water_y:
 			ball.position.y = water_y + 0.04 + sin(time * 3) * 0.01
@@ -357,6 +410,7 @@ func _process(delta: float) -> void:
 		if b.position.distance_to(p) < 1.0:
 			b.visible = false
 			got += 1
+			_sfx("fanfare" if got == treats.size() else "treat", null, -6.0)
 			_toast("All treats found! 🏆 Press L for the next level" if got == treats.size() else "Treat! %d/%d" % [got, treats.size()])
 			_score()
 

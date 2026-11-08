@@ -117,7 +117,14 @@ func _build() -> void:
 	var bm := box(1, 1, 1)
 	bm.subdivide_width = 2
 	bm.subdivide_depth = 2
-	scatter(bm, MeshUtil.ground_mat("boulder", 0.5, 0.85), slabs.size(), place_slab, true)
+	scatter(bm, MeshUtil.ground_mat("boulder", 0.5, 0.85, 0.0, Color(0.78, 0.76, 0.72)), slabs.size(), place_slab, true)
+
+	# scanned limestone boulders along both banks
+	var place_bank_rock := func(_i: int) -> Dictionary:
+		var p := _bank(5.0, 12.0)
+		var rad := 0.3 + r() * r() * 1.4
+		return {"p": p - Vector3(0, rad * 0.12, 0), "s": Vector3(rad * 1.2, rad * 0.8, rad), "c": pick(slab_cols)}
+	scan_scatter(70, place_bank_rock)
 
 	# the big framing oak + groves on both banks, distant hills
 	var fx := _path_x(10.0) - 5.0

@@ -47,6 +47,17 @@ Rebuilt from the Three.js prototype. Same art direction, dogs, levels and gamepl
 - Forward+ only (desktop): volumetric fog god rays, SSR, SSIL, SSAO, TAA, 4-split soft shadows,
   far DOF. The web build ignores these.
 
+## Assets & audio (v3)
+- Photoscanned rocks: `LevelBase.scan_scatter(n, place, names)` — Poly Haven scans simplified to
+  ~3k tris (`tools/bake_rocks.gd`, raw files via `tools/fetch_polyhaven.py`, then
+  `tools/sanitize_scans.gd`), `shaders/scan.gdshader` tints them toward the level palette.
+  Ground/ledges/bark get the matching scanned normal maps (`ground_mat` detail sets in `MeshUtil.DETAIL`).
+- Audio: `scripts/sounds.gd` (`main.sfx`): music loop, per-level ambience `audio/amb_<level>.ogg`
+  (crossfaded), pooled 2D/3D effects `main.sfx.play(name, pos, db)`. Everything is synthesized by
+  `python3 tools/make_audio.py` (numpy + ffmpeg). Keys: B bark, M mute.
+- Dogs: gaits blend walk → trot → rotary gallop by speed, lean into turns, `look_target` head tracking.
+  Artist models: `models/dogs/<breed>.glb` or `dog.glb` replace the procedural dog (`Dog._build_model`).
+
 ## Conventions
 - Dog-local space: +z forward, +y up. Heading = rotation.y; forward = (sin h, 0, cos h).
 - Dog rig nodes use `EULER_ORDER_XYZ` to match the original three.js animation math.

@@ -64,8 +64,15 @@ func _build() -> void:
 		var z := -80.0 + r() * 130.0
 		var x := _bank_l(z) - r() * 3.0
 		var rad := 0.3 + r() * 0.6
-		return {"p": Vector3(x, ground_h(x, z), z), "s": Vector3(rad * 1.3, rad * 0.6, rad), "c": pick([Color("#e6dcc4"), Color("#d4c8aa")])}
-	scatter(rock_mesh(1), MeshUtil.ground_mat("boulder", 0.5, 0.85), 120, place_rock, true)
+		return {"p": Vector3(x, ground_h(x, z) - rad * 0.15, z), "s": Vector3(rad * 1.3, rad * 0.8, rad), "c": pick([Color("#e6dcc4"), Color("#d4c8aa")])}
+	scan_scatter(120, place_rock)
+	# scanned stones scattered on the golden bed, under the water
+	var place_bed := func(_i: int) -> Dictionary:
+		var z := -70.0 + r() * 110.0
+		var x := _bank_l(z) + r() * 26.0
+		var rad := 0.2 + r() * r() * 0.6
+		return {"p": Vector3(x, ground_h(x, z) - rad * 0.2, z), "s": Vector3(rad * 1.3, rad * 0.6, rad), "c": pick(stones)}
+	scan_scatter(140, place_bed, ["rock_07", "rock_09", "stone_01"], false, 1.0)
 
 	# stone retaining wall on the far bank
 	var wall_a := MeshUtil.std(Color("#d8d2c2"), 1.0)
