@@ -7,6 +7,9 @@ uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
 uniform float saturation = 1.15;
 uniform float glint = 1.0;
 uniform int radius : hint_range(2, 6) = 4; // brush size: 3 = sharper/faster, 5-6 = more painted/slower
+uniform vec2 sun_uv = vec2(0.5, -1.0); // sun position on screen
+uniform float sun_vis = 0.0;            // 0 = sun behind the camera
+uniform float shafts = 0.55;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
@@ -66,6 +69,27 @@ void fragment() {
 			+ step(0.93, luma(texture(screen_tex, uv - vec2(0.0, f * px.y)).rgb))) * fall * fall;
 	}
 	col += vec3(1.0, 0.97, 0.88) * g * 0.06 * glint;
+
+	// crepuscular rays: march toward the sun gathering bright sky, so light pours through canopies
+	if (sun_vis > 0.0) {
+		vec2 dir = (sun_uv - uv) / 32.0;
+		vec2 p = uv;
+		float acc = 0.0, w = 1.0;
+		for (int k = 0; k < 32; k++) {
+			p += dir;
+			vec3 s = texture(screen_tex, clamp(p, vec2(0.0), vec2(1.0))).rgb;
+			float sky = smoothstep(0.62, 0.85, luma(s)) * step(s.r, s.b + 0.15);
+			acc += sky * w;
+			w *= 0.94;
+		}
+		float near_sun = 1.0 - smoothstep(0.0, 1.1, length((uv - sun_uv) * vec2(res.x / res.y, 1.0)));
+		col += vec3(1.0, 0.9, 0.68) * (acc / 14.0) * shafts * sun_vis * (0.35 + 0.65 * near_sun);
+	}
+
+	// split-tone grade: cool teal shadows, warm golden highlights
+	float lg = luma(col);
+	col = mix(col, col * vec3(0.9, 1.0, 1.06), (1.0 - smoothstep(0.0, 0.45, lg)) * 0.6);
+	col = mix(col, col * vec3(1.06, 1.01, 0.9), smoothstep(0.55, 1.0, lg) * 0.6);
 
 	// saturation + warm summer grade
 	float l = luma(col);

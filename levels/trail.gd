@@ -481,3 +481,15 @@ func _process(delta: float) -> void:
 
 	if main:
 		main.set_debug("%d fps · %d/%d m" % [Engine.get_frames_per_second(), s, path_len])
+
+
+func _grass_pass() -> void:
+	var where := func(x: float, z: float, _y: float) -> Color:
+		var d := path_dist(x, z)
+		if d < 2.2:
+			return Color(0, 0, 0, 0)
+		var n := sin(x * 1.1) * cos(z * 0.9) * 0.5 + 0.5
+		var c := Color("#6f8a3a").lerp(Color("#93a845"), n)
+		c.a = MeshUtil.ss(d, 2.2, 3.6) * 0.9
+		return c
+	grass(Rect2(-30, -155, 60, 172), 9.0, where, 0.45)

@@ -47,6 +47,7 @@ var ears: Array[Dictionary] = []
 var lids: Array[Node3D] = []
 var fur_mat: ShaderMaterial
 var tail_mat: ShaderMaterial
+var shells := 20
 
 var drops: MultiMeshInstance3D
 var _d_pos := PackedVector3Array()
@@ -109,8 +110,10 @@ func _init(key := "golden") -> void:
 	fl = B.furLen
 	coat = Color(B.coat)
 	second = Color(B.second)
-	fur_mat = Fur.material(B.curl, 30.0 if B.curl > 0.5 else 42.0, 0.25)
-	tail_mat = Fur.material(B.curl, 30.0 if B.curl > 0.5 else 42.0, 0.6)
+	var dens := 52.0 if B.curl > 0.5 else 72.0
+	fur_mat = Fur.material(B.curl, dens, 0.25)
+	tail_mat = Fur.material(B.curl, dens, 0.6)
+	shells = mini(32, int(B.shells * 1.5))
 	_build()
 
 
@@ -131,7 +134,7 @@ func _furred(id: String, make: Callable, parent: Node3D, fur_scale := 1.0, tail 
 	var key := breed + "/" + id
 	if not _cache.has(key):
 		var d: Dictionary = make.call()
-		_cache[key] = [MeshUtil.to_mesh(d, _skin_mat), Fur.shells_mesh(d, B.shells, fl * fur_scale, null)]
+		_cache[key] = [MeshUtil.to_mesh(d, _skin_mat), Fur.shells_mesh(d, shells, fl * fur_scale, null)]
 	var pair: Array = _cache[key]
 	MeshUtil.mesh_instance(pair[0], parent)
 	var f := MeshUtil.mesh_instance(pair[1], parent, Vector3.ZERO, false)
@@ -195,7 +198,7 @@ func _build() -> void:
 		for sx in [1.0, -1.0]:
 			s.ellipsoid(v3.call(sx * 0.15 * W, -0.04, 0.3), v3.call(0.09, 0.2, 0.13))
 			s.ellipsoid(v3.call(sx * 0.13 * W, -0.06, -0.42), v3.call(0.1, 0.21, 0.16))
-		return MeshUtil.colorize(s.build(v3.call(0, 0.08, 0.05), 0.85, 40), _tint.bind("body"))
+		return MeshUtil.colorize(s.build(v3.call(0, 0.08, 0.05), 0.85, 54), _tint.bind("body"))
 	_furred("body", make_body, rig)
 
 	# ---- head: skull + upper muzzle + brows + cheeks + lips, eye sockets carved; separate jaw ----
@@ -242,7 +245,7 @@ func _build() -> void:
 			s.capsule(Vector3(-0.04, 0.14, 0.09), Vector3(0.04, 0.14, 0.09), 0.012)
 		s.carve_sphere(Vector3(ex, ey, ez + 0.015), 0.03)
 		s.carve_sphere(Vector3(-ex, ey, ez + 0.015), 0.03)
-		var d := MeshUtil.colorize(s.build(Vector3(0, 0, 0.08), 0.34, 36), _tint.bind("head"))
+		var d := MeshUtil.colorize(s.build(Vector3(0, 0, 0.08), 0.34, 46), _tint.bind("head"))
 		return with_len.call(d, face_len)
 	_furred("head", make_head, head, head_fur)
 
@@ -274,7 +277,7 @@ func _build() -> void:
 		var s := Sculpt.new(0.04)
 		s.capsule(Vector3(0, -0.01, 0.0), Vector3(0, -0.012, sn * 0.85 + 0.03), 0.06 if frenchie else 0.045, 0.055 if frenchie else 0.04)
 		s.ellipsoid(Vector3(0, -0.03, 0.0), Vector3(0.06, 0.04, 0.06))
-		var d := MeshUtil.colorize(s.build(Vector3(0, -0.02, 0.07), 0.2, 24), jaw_tint)
+		var d := MeshUtil.colorize(s.build(Vector3(0, -0.02, 0.07), 0.2, 30), jaw_tint)
 		return with_len.call(d, short_fur)
 	_furred("jaw", make_jaw, jaw, head_fur)
 	_plain(_sphere_mesh(1.0, 14, 10), _mouth, Vector3(0, 0.02, sn * 0.45 + 0.02), jaw, Vector3(0.05, 0.022, maxf(0.06, sn * 0.5)))
@@ -425,7 +428,6 @@ func collar_world() -> Vector3:
 
 ## fur LOD: 24 = full shells, fewer when far from the camera
 func set_fur_detail(k: int) -> void:
-	var shells: int = B.shells
 	var use := ceili(k / 24.0 * shells)
 	var frac := float(clampi(use, 1, shells)) / shells + 0.001
 	fur_mat.set_shader_parameter("max_shell", frac)

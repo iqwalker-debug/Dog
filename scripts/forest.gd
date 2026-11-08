@@ -11,13 +11,13 @@ const LEAF_SHADER := preload("res://shaders/leaf.gdshader")
 const LEAF_TINTS := ["#fff7b8", "#f4ffb0", "#fff0a0", "#eaffc0", "#ffe890"]
 const OAK := {"trunk_len": 3.0, "trunk_r": 0.34, "gnarl": 0.28, "levels": 3, "children": [5, 4, 3],
 	"angle": [1.0, 0.8, 0.65], "len_ratio": [0.8, 0.62, 0.5], "start": [0.5, 0.25, 0.2], "droop": [0.0, -0.08, -0.12],
-	"leaf_size": 0.95, "leaves": 14, "leaf_spread": 0.9}
+	"leaf_size": 0.8, "leaves": 18, "leaf_spread": 0.95}
 const ASPEN := {"trunk_len": 6.5, "trunk_r": 0.2, "gnarl": 0.12, "levels": 3, "children": [7, 3, 3],
 	"angle": [0.6, 0.6, 0.5], "len_ratio": [0.38, 0.6, 0.5], "start": [0.35, 0.2, 0.2], "droop": [0.05, -0.02, -0.05],
-	"leaf_size": 0.75, "leaves": 13, "leaf_spread": 0.8}
+	"leaf_size": 0.62, "leaves": 17, "leaf_spread": 0.85}
 const BUSH := {"trunk_len": 0.15, "trunk_r": 0.06, "gnarl": 0.35, "levels": 2, "children": [7, 4],
 	"angle": [1.05, 0.7], "len_ratio": [5.0, 0.55], "start": [0.3, 0.2], "droop": [0.0, -0.1],
-	"leaf_size": 0.45, "leaves": 12, "leaf_spread": 0.6}
+	"leaf_size": 0.38, "leaves": 16, "leaf_spread": 0.6}
 const VARIANTS := [
 	{"p": OAK, "seed": 101, "tint": 0}, {"p": OAK, "seed": 202, "tint": 1}, {"p": OAK, "seed": 303, "tint": 2},
 	{"p": OAK, "seed": 404, "tint": 3}, {"p": OAK, "seed": 505, "tint": 4}, {"p": ASPEN, "seed": 606, "yellow": true},
@@ -261,18 +261,18 @@ static func _leaf_mat(tint: Color) -> ShaderMaterial:
 static func leaf_texture() -> ImageTexture:
 	if _leaf_tex:
 		return _leaf_tex
-	var S := 128
+	var S := 256
 	var img := Image.create(S, S, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0.42, 0.55, 0.2, 0.0))
 	var r := RandomNumberGenerator.new()
 	r.seed = 9
 	var cols := [Color("#b9d04a"), Color("#94b83b"), Color("#6e9a34"), Color("#d8dc5c"), Color("#5a8a30"), Color("#c7d84f")]
-	for k in 46:
+	for k in 110:
 		var a := r.randf() * TAU
 		var rad := sqrt(r.randf()) * 0.36 * S
 		var cx := S * 0.5 + cos(a) * rad
 		var cy := S * 0.5 + sin(a) * rad
-		var ln := S * (0.09 + r.randf() * 0.06)
+		var ln := S * (0.06 + r.randf() * 0.045)
 		var wd := ln * 0.42
 		var rot := r.randf() * TAU
 		var col: Color = cols[r.randi() % cols.size()]

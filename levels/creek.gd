@@ -110,7 +110,7 @@ func _build() -> void:
 	terrain({"w": 100.0, "d": 110.0, "cz": -5.0, "seg": 1.7, "detail": "forest", "caustics": 1.0, "color": color})
 
 	# slabs
-	var slab_cols := [Color("#eadfc3"), Color("#d8cba8"), Color("#f1e7cf")]
+	var slab_cols := [Color("#cfc2a2"), Color("#bfb08c"), Color("#d6cbb0")]
 	var place_slab := func(i: int) -> Dictionary:
 		var s := slabs[i]
 		return {"p": Vector3(s.x, s.top - 0.4, s.z), "s": Vector3(s.w, 0.8, s.d), "rot": Vector3(0, s.rot, 0), "c": pick(slab_cols)}
@@ -215,3 +215,17 @@ static func _disc(rad: float, segs: int, b := Basis()) -> ArrayMesh:
 		var a2 := 1 + (s + 1) % segs
 		idx.append_array([0, a1, a2, 0, a2, a1])
 	return MeshUtil.to_mesh({"v": v, "n": n, "i": idx})
+
+
+func _grass_pass() -> void:
+	var lush := Color("#8fb045")
+	var dry := Color("#c9c46a")
+	var where := func(x: float, z: float, y: float) -> Color:
+		var d := absf(x - _cx(z))
+		if y < 0.35 or d < 6.0 or absf(x - _path_x(z)) < 1.3:
+			return Color(0, 0, 0, 0)
+		var n := sin(x * 0.9) * cos(z * 0.7) * 0.5 + 0.5
+		var c := lush.lerp(dry, n * 0.7)
+		c.a = MeshUtil.ss(d, 6.0, 8.0)
+		return c
+	grass(Rect2(-50, -60, 100, 110), 11.0, where, 0.55)

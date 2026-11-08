@@ -124,3 +124,13 @@ func _graffiti() -> ImageTexture:
 		img.fill_rect(Rect2i(c, Vector2i(2 + int(r() * 5), 2 + int(r() * 5))).intersection(Rect2i(0, 0, w, h)), Color(0.5, 0.52, 0.5, 1).lerp(Color("#9aa3a6"), r()))
 	img.generate_mipmaps()
 	return ImageTexture.create_from_image(img)
+
+
+func _grass_pass() -> void:
+	var where := func(x: float, z: float, y: float) -> Color:
+		if y < 0.6 or x < 28.0:
+			return Color(0, 0, 0, 0)
+		var c := Color("#8fae42").lerp(Color("#bfc05e"), sin(z * 0.4) * 0.5 + 0.5)
+		c.a = MeshUtil.ss(x, 28.0, 32.0)
+		return c
+	grass(Rect2(26, -30, 44, 60), 9.0, where, 0.5)

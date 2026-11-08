@@ -93,3 +93,17 @@ func _build() -> void:
 		prop(box(6.0 + r() * 6.0, h, 6.0), Color("#8fa3b3"), Vector3(-10.0 + i * 7.0 + r() * 4.0, h / 2.0, -150.0 - r() * 20.0), 1.0, false)
 	for i in 160:
 		forest.blob(-50.0 + r() * 100.0, 2.0 + r() * 6.0, -120.0 - r() * 15.0, 3.0 + r() * 3.0, pick([Color("#7fa65a"), Color("#99b45a"), Color("#6a9a5f")]))
+
+
+func _grass_pass() -> void:
+	var g := Color("#9fb54a")
+	var where := func(x: float, z: float, y: float) -> Color:
+		if y < 0.4:
+			return Color(0, 0, 0, 0)
+		var c := g.lerp(Color("#c4c06a"), sin(x * 0.5 + z * 0.3) * 0.5 + 0.5)
+		if x < 0.0:
+			c.a = MeshUtil.ss(_bank_l(z) - x, 3.0, 8.0)
+		else:
+			c.a = 1.0 if x > _bank_r(z) + 1.5 else 0.0
+		return c
+	grass(Rect2(-55, -90, 105, 140), 9.0, where, 0.5)

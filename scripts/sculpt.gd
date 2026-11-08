@@ -85,7 +85,22 @@ func dist(p: Vector3) -> float:
 
 
 ## Polygonize inside the cube (center, half-size) at res^3 samples. Returns {v, n, i}.
+## Results are cached in res://dogcache/ (baked by tools/bake_dogs.gd) so levels load fast.
 func build(center: Vector3, half: float, res: int) -> Dictionary:
+	var key := "%x" % str([shapes, carves, k, center, half, res]).hash()
+	var path := "res://dogcache/%s.res" % key
+	if ResourceLoader.exists(path):
+		var cached: ArrayMesh = load(path)
+		var a := cached.surface_get_arrays(0)
+		return {"v": a[Mesh.ARRAY_VERTEX], "n": a[Mesh.ARRAY_NORMAL], "i": a[Mesh.ARRAY_INDEX]}
+	var out := _build(center, half, res)
+	if OS.has_feature("editor") or not OS.has_feature("template"):
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://dogcache"))
+		ResourceSaver.save(MeshUtil.to_mesh(out), path, ResourceSaver.FLAG_COMPRESS)
+	return out
+
+
+func _build(center: Vector3, half: float, res: int) -> Dictionary:
 	var n := res
 	var nn := n * n
 	var step := 2.0 * half / float(n - 1)
@@ -147,6 +162,27 @@ func build(center: Vector3, half: float, res: int) -> Dictionary:
 					_quad(idx, cell, m, Vector3i(x - 1, y, z - 1), Vector3i(x, y, z - 1), Vector3i(x, y, z), Vector3i(x - 1, y, z))
 				if (f0 < 0.0) != (f[x + y * n + (z + 1) * nn] < 0.0):
 					_quad(idx, cell, m, Vector3i(x - 1, y - 1, z), Vector3i(x, y - 1, z), Vector3i(x, y, z), Vector3i(x - 1, y, z))
+
+	# relax the surface-nets vertices (2 Laplacian passes) for clay-smooth forms
+	var nb: Array[PackedInt32Array] = []
+	nb.resize(verts.size())
+	for t in range(0, idx.size(), 3):
+		for e in 3:
+			var a := idx[t + e]
+			var c := idx[t + (e + 1) % 3]
+			nb[a].append(c)
+			nb[c].append(a)
+	for it in 2:
+		var nv := verts.duplicate()
+		for i in verts.size():
+			var lst := nb[i]
+			if lst.is_empty():
+				continue
+			var acc := Vector3.ZERO
+			for j in lst:
+				acc += verts[j]
+			nv[i] = verts[i].lerp(acc / lst.size(), 0.5)
+		verts = nv
 
 	# outward normals from the distance field's gradient
 	var nrm := PackedVector3Array()

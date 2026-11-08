@@ -113,6 +113,23 @@ func load_level(name: String) -> void:
 		level.swap_breed(args.breed)
 
 
+## Sun position on screen for the paint pass's light shafts.
+func _update_sun() -> void:
+	if not level or not level.camera or not level.sun:
+		return
+	var cam := level.camera
+	var to_sun := level.sun.global_transform.basis.z.normalized()
+	var mat := post.material as ShaderMaterial
+	var facing := to_sun.dot(-cam.global_transform.basis.z)
+	if facing <= 0.0:
+		mat.set_shader_parameter("sun_vis", 0.0)
+		return
+	var sp := cam.unproject_position(cam.global_position + to_sun * 1000.0)
+	var vp := get_viewport().get_visible_rect().size
+	mat.set_shader_parameter("sun_uv", sp / vp)
+	mat.set_shader_parameter("sun_vis", smoothstep(0.0, 0.5, facing))
+
+
 func next_level() -> void:
 	call_deferred("load_level", LEVELS[(LEVELS.find(level_name) + 1) % LEVELS.size()])
 
@@ -141,6 +158,7 @@ func _unhandled_input(e: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
+	_update_sun()
 	toast_t -= delta
 	if toast_t <= 0.0:
 		toast_label.text = ""

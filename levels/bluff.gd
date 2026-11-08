@@ -168,3 +168,13 @@ func _tuft() -> Mesh:
 	c.rings = 1
 	var a := MeshUtil.prim(c, Transform3D(Basis(), Vector3(0, 0.17, 0)))
 	return MeshUtil.to_mesh(a)
+
+
+func _grass_pass() -> void:
+	var where := func(x: float, z: float, y: float) -> Color:
+		if z < 13.0 or y > 6.0:
+			return Color(0, 0, 0, 0)
+		var c := Color("#9aa64e").lerp(Color("#c4ad62"), sin(x * 0.6) * 0.5 + 0.5)
+		c.a = MeshUtil.ss(z, 13.0, 17.0)
+		return c
+	grass(Rect2(-55, 12, 110, 26), 9.0, where, 0.45)

@@ -5,6 +5,10 @@ extends Node3D
 
 const WATER_SHADER := preload("res://shaders/water.gdshader")
 const SKY_SHADER := preload("res://shaders/sky.gdshader")
+const GRASS_SHADER := preload("res://shaders/grass.gdshader")
+
+static var _clump: ArrayMesh
+static var _grass_mat: ShaderMaterial
 
 var id := ""
 var main: Node # the Main node (HUD, post-processing, level switching)
@@ -96,7 +100,28 @@ func setup_env(fog: Array, ground_tint := Color("#7a7a45"), far := 400.0) -> voi
 	env.fog_depth_curve = 1.0
 	env.fog_sky_affect = 0.0
 	env.fog_sun_scatter = 0.0
-	# Forward+ only (ignored by the Compatibility renderer): warm ambient occlusion
+	# soft bloom on sun-lit water, sky and pale limestone
+	env.glow_enabled = true
+	env.glow_intensity = 0.35
+	env.glow_strength = 1.0
+	env.glow_bloom = 0.02
+	env.glow_hdr_threshold = 1.25
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
+	# ---- Forward+ only (ignored by the Compatibility/web renderer) ----
+	# volumetric light: sun shafts through the canopy, warm summer haze
+	env.volumetric_fog_enabled = true
+	env.volumetric_fog_density = 0.006
+	env.volumetric_fog_albedo = Color("#fff4dc")
+	env.volumetric_fog_anisotropy = 0.6
+	env.volumetric_fog_length = 80.0
+	env.volumetric_fog_ambient_inject = 0.15
+	env.volumetric_fog_sky_affect = 0.0
+	# reflections on water/wet rock and bounced light
+	env.ssr_enabled = true
+	env.ssr_max_steps = 48
+	env.ssil_enabled = true
+	env.ssil_intensity = 0.8
+	# warm ambient occlusion
 	env.ssao_enabled = true
 	env.ssao_radius = 1.6
 	env.ssao_intensity = 2.2
@@ -113,8 +138,11 @@ func setup_env(fog: Array, ground_tint := Color("#7a7a45"), far := 400.0) -> voi
 	sun.shadow_bias = 0.04
 	sun.shadow_normal_bias = 1.2
 	sun.shadow_blur = 1.5
-	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-	sun.directional_shadow_max_distance = 70.0
+	var compat := RenderingServer.get_current_rendering_method() == "gl_compatibility"
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if compat else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	sun.directional_shadow_max_distance = 70.0 if compat else 110.0
+	sun.light_volumetric_fog_energy = 1.6
+	sun.light_angular_distance = 0.6 # soft contact-hardening shadows (Forward+)
 	add_child(sun)
 	sun.look_at_from_position(Vector3(-16, 34, 12), Vector3.ZERO)
 
@@ -122,6 +150,13 @@ func setup_env(fog: Array, ground_tint := Color("#7a7a45"), far := 400.0) -> voi
 	camera.fov = 70.0
 	camera.near = 0.05
 	camera.far = far
+	# gentle atmospheric softness in the distance (Forward+)
+	var ca := CameraAttributesPractical.new()
+	ca.dof_blur_far_enabled = true
+	ca.dof_blur_far_distance = 85.0
+	ca.dof_blur_far_transition = 60.0
+	ca.dof_blur_amount = 0.04
+	camera.attributes = ca
 	add_child(camera)
 	camera.make_current()
 
@@ -260,7 +295,98 @@ static func rock_mesh(detail := 1) -> Mesh:
 	return s
 
 
+## Wind-blown grass over a rectangle, in 12 m tiles that fade out with distance.
+## where(x, z, y) -> Color: grass color there, or Color(0,0,0,0) for none (alpha = density 0..1).
+## density = clumps per square meter at alpha 1; height in meters.
+func grass(area: Rect2, density: float, where: Callable, height := 0.45) -> void:
+	if OS.has_feature("web"):
+		density *= 0.5
+	var tile := 12.0
+	var tx := ceili(area.size.x / tile)
+	var tz := ceili(area.size.y / tile)
+	for i in tx:
+		for j in tz:
+			var x0 := area.position.x + i * tile
+			var z0 := area.position.y + j * tile
+			var xfs: Array[Transform3D] = []
+			var cols: Array[Color] = []
+			var n := int(tile * tile * density)
+			for k in n:
+				var x := x0 + rng.randf() * tile
+				var z := z0 + rng.randf() * tile
+				var y := ground_h(x, z)
+				var c: Color = where.call(x, z, y)
+				if c.a <= 0.0 or rng.randf() > c.a:
+					continue
+				var h := height * (0.55 + rng.randf() * 0.8)
+				var w := 0.7 + rng.randf() * 0.6
+				var b := Basis(Vector3.UP, rng.randf() * TAU) * Basis.from_scale(Vector3(w, h, w))
+				xfs.append(Transform3D(b, Vector3(x, y - 0.02, z)))
+				var v := 0.85 + rng.randf() * 0.3
+				cols.append(Color(c.r * v, c.g * v, c.b * (0.9 + rng.randf() * 0.2)))
+			if xfs.is_empty():
+				continue
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.use_colors = true
+			mm.mesh = _grass_clump()
+			mm.instance_count = xfs.size()
+			for k in xfs.size():
+				mm.set_instance_transform(k, xfs[k])
+				mm.set_instance_color(k, cols[k])
+			var mi := MultiMeshInstance3D.new()
+			mi.multimesh = mm
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			mi.visibility_range_end = 46.0
+			mi.visibility_range_end_margin = 8.0
+			mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+			add_child(mi)
+
+
+## One clump: 7 curved, tapering blades (unit height). UV.y = height along the blade.
+static func _grass_clump() -> ArrayMesh:
+	if _clump:
+		return _clump
+	if not _grass_mat:
+		_grass_mat = ShaderMaterial.new()
+		_grass_mat.shader = GRASS_SHADER
+	var v := PackedVector3Array()
+	var n := PackedVector3Array()
+	var uv := PackedVector2Array()
+	var idx := PackedInt32Array()
+	var r := RandomNumberGenerator.new()
+	r.seed = 3
+	var segs := 4
+	for b in 7:
+		var a := r.randf() * TAU
+		var dir := Vector3(cos(a), 0, sin(a))
+		var side := Vector3(-dir.z, 0, dir.x)
+		var root := dir * r.randf() * 0.06
+		var lean := 0.15 + r.randf() * 0.35
+		var hgt := 0.6 + r.randf() * 0.4
+		var wid := 0.018 + r.randf() * 0.012
+		var base := v.size()
+		for s in segs + 1:
+			var f := float(s) / segs
+			var c := root + dir * lean * f * f + Vector3(0, hgt * f, 0)
+			var hw := wid * (1.0 - f * 0.92)
+			var nrm := (side.cross(Vector3(0, 1, 0) + dir * lean * 2.0 * f)).normalized()
+			v.append(c - side * hw)
+			v.append(c + side * hw)
+			n.append(nrm)
+			n.append(nrm)
+			uv.append(Vector2(0, f))
+			uv.append(Vector2(1, f))
+		for s in segs:
+			var a0 := base + s * 2
+			idx.append_array([a0, a0 + 2, a0 + 1, a0 + 1, a0 + 2, a0 + 3])
+	_clump = MeshUtil.to_mesh({"v": v, "n": n, "uv": uv, "i": idx}, _grass_mat)
+	return _clump
+
+
 func finish_build() -> void:
+	if has_method("_grass_pass"):
+		call("_grass_pass")
 	forest.flush(self)
 
 
