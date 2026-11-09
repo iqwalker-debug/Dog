@@ -9,7 +9,7 @@ import { placeTree, updateTrees } from './trees.js';
 import { addDetail, TEX } from './textures.js';
 export { addDetail, TEX, placeTree };
 
-export const LEVEL_ORDER = ['swimhole', 'trail', 'bluff', 'creek', 'river', 'station'];
+export const LEVEL_ORDER = ['swimhole', 'trail', 'bluff', 'creek', 'river', 'station', 'swimstation'];
 export const nextLevel = (cur) => LEVEL_ORDER[(LEVEL_ORDER.indexOf(cur) + 1) % LEVEL_ORDER.length];
 export { THREE, makeRiverbedMaterial };
 
@@ -75,9 +75,9 @@ export function makeForest(scene, rnd, max = 5000) {
 }
 
 /** Clear water plane with fresnel + ripple normals (same look as the swimming hole). */
-export function makeWater(scene, { w, d, cx = 0, cz = 0, y = 0, color = '#138a80', clear = 0.38 }) {
+export function makeWater(scene, { w, d, cx = 0, cz = 0, y = 0, color = '#138a80', clear = 0.38, opacity = 0.5 }) {
   const uniforms = { uTime: { value: 0 } };
-  const mat = new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.5, roughness: 0.08, depthWrite: false });
+  const mat = new THREE.MeshStandardMaterial({ color, transparent: true, opacity, roughness: 0.08, depthWrite: false });
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = uniforms.uTime;
     sh.vertexShader = sh.vertexShader
@@ -190,12 +190,14 @@ export function runLevel(cfg) {
         const k = Math.max(w / st.aspect, h) * margin;
         L.mesh.scale.set(k * st.aspect, k, 1);
         L.mesh.position.copy(basePos).addScaledVector(dir, L.d); L.mesh.lookAt(basePos); L.mesh.renderOrder = -10 + i;
+        // cropY: which row of the painting sits at screen centre (0.5 = middle). Lets a portrait painting show its upper band.
+        if (st.cropY !== undefined) L.mesh.position.addScaledVector(camera.up, -(0.5 - st.cropY) * k * (L.d / L.d));
       });
     };
     layers.forEach((L) => scene.add(L.mesh)); fitBackdrop(); addEventListener('resize', fitBackdrop);
 
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60).rotateX(-Math.PI / 2), new THREE.ShadowMaterial({ color: '#2b2416', opacity: st.shadow ?? 0.4 }));
-    floor.receiveShadow = true; scene.add(floor);
+    floor.position.y = st.floorY ?? 0; floor.receiveShadow = true; scene.add(floor);
     scene.add(new THREE.HemisphereLight('#fff6e0', '#d8c79a', st.fill ?? 0.9)); // paintings are high-key: lift the dogs to match
     R.painterly.uniforms.saturation.value = st.saturation ?? 1.0; // the painting already carries the palette
     R.painterly.uniforms.bleed.value = st.bleed ?? 0.7;         // soften the seam where 3D dogs meet the painting
