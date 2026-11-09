@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { createPainterlyRenderer, makeRiverbedMaterial } from './painterly.js';
 import { createDog } from './dog.js';
+import { gaitFrameMs, OLD_GAIT } from './gait.js';
 import { BREED_ORDER } from './breeds.js';
 import { placeTree, updateTrees } from './trees.js';
 import { addDetail, TEX } from './textures.js';
@@ -165,11 +166,11 @@ export function runLevel(cfg) {
   const animated = cfg.build(ctx) || [];
 
   // ---- dogs ----
-  let dog = createDog(cfg.player || 'golden');
+  let dog = createDog(cfg.player || 'golden'); dog.setGround(groundH);
   dog.group.position.set(cfg.start.x, groundH(cfg.start.x, cfg.start.z), cfg.start.z);
   scene.add(dog.group, dog.drops);
   const buddies = (cfg.buddies || []).map((b, i) => {
-    const d = createDog(b);
+    const d = createDog(b); d.setGround(groundH);
     d.group.position.set(cfg.start.x + (i + 1) * 1.6, groundH(cfg.start.x + (i + 1) * 1.6, cfg.start.z + 1), cfg.start.z + 1);
     scene.add(d.group, d.drops);
     return { dog: d, heading: cfg.start.heading, vel: new THREE.Vector3(), off: new THREE.Vector3((i % 2 ? 1 : -1) * (1.4 + i * 0.6), 0, -1.2 - i * 0.8), wanderT: rnd() * 5, sniff: 0 };
@@ -217,7 +218,7 @@ export function runLevel(cfg) {
     if (e.code === 'KeyF') throwBall();
     const dn = e.code.match(/^Digit(\d)$/);
     if (dn) {
-      const old = dog; dog = createDog(BREED_ORDER[(+dn[1] + 9) % 10]);
+      const old = dog; dog = createDog(BREED_ORDER[(+dn[1] + 9) % 10]); dog.setGround(groundH);
       dog.group.position.copy(old.group.position); scene.remove(old.group); old.dispose(); scene.add(dog.group, dog.drops);
       if (carrier === old) carrier = dog;
       toast(dog.name);
@@ -355,7 +356,7 @@ export function runLevel(cfg) {
     toastT -= dt;
     toastEl.textContent = `🦴 ${got}/${TREATS}  ·  🎾 ${fetchScore}` + (toastT > 0 ? `\n${toastMsg}` : '');
     toastEl.style.whiteSpace = 'pre';
-    if (hud.style.display === 'block') hud.textContent = `${(1 / dt).toFixed(0)} fps · ${dog.mode} · wet ${dog.wet.toFixed(2)}`;
+    if (hud.style.display === 'block') hud.textContent = `${(1 / dt).toFixed(0)} fps · ${dog.mode} · wet ${dog.wet.toFixed(2)} · gait ${OLD_GAIT ? 'old' : gaitFrameMs().toFixed(2) + 'ms'}`;
     requestAnimationFrame(tick);
   }
   tick();

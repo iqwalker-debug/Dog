@@ -195,7 +195,7 @@ const pack = [
   { breed: 'husky', leash: '#e8822e', slot: 0.28, ahead: 3.9 },
   { breed: 'redGolden', leash: '#1d1d20', slot: 0.8, ahead: 2.5 },
 ].map((d, i) => {
-  const dog = createDog(d.breed);
+  const dog = createDog(d.breed); dog.setGround((x, z) => groundH(x, z, 0.5));
   const start = onPath(6 + d.ahead, d.slot);
   dog.group.position.copy(start);
   scene.add(dog.group, dog.drops);
