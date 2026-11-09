@@ -163,23 +163,75 @@ export function runLevel(cfg) {
 
   // ---- painted station (step 9): fixed camera, a painting as the backdrop, a shadow-only floor ----
   const st = cfg.station;
+  let stationTick = null;
   if (st) {
+    // step 11: the painting lives in world space as two layers (far: everything; near: ground below the horizon,
+    // faded in over a soft band) so a gently drifting camera gets parallax; sun is a spotlight with an animated
+    // leaf-dapple cookie; time of day (?hour=) sets sun height and warmth; FOV pushes in when the dog runs.
+    const basePos = new THREE.Vector3(...st.pos), baseLook = new THREE.Vector3(...st.look);
+    const dir = baseLook.clone().sub(basePos).normalize();
     camera.fov = st.fov; camera.near = 0.1; camera.far = 500; camera.updateProjectionMatrix();
-    camera.position.set(...st.pos); camera.lookAt(...st.look);
+    camera.position.copy(basePos); camera.lookAt(baseLook);
     const tex = new THREE.TextureLoader().load(st.image); tex.colorSpace = THREE.SRGBColorSpace;
-    const backdrop = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, fog: false, toneMapped: false }));
-    backdrop.position.z = -300; camera.add(backdrop); scene.add(camera);
-    const fitBackdrop = () => { // cover the viewport, keep the painting's aspect
-      const h = 2 * 300 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2), w = h * camera.aspect;
-      const k = Math.max(w / st.aspect, h); backdrop.scale.set(k * st.aspect, k, 1);
+    const horizon = st.horizon ?? 0.43, band = st.band ?? 0.1;
+    const alphaTex = softTexture((g, size) => { // 0 above the horizon, 1 below it (canvas y runs top->bottom like the image)
+      const grd = g.createLinearGradient(0, size * (horizon - band / 2), 0, size * (horizon + band / 2));
+      grd.addColorStop(0, '#000'); grd.addColorStop(1, '#fff'); g.fillStyle = grd; g.fillRect(0, 0, size, size);
+    });
+    alphaTex.colorSpace = THREE.NoColorSpace;
+    const layers = [
+      { d: st.farDist ?? 150, mesh: new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, fog: false, toneMapped: false })) },
+      { d: st.nearDist ?? 40, mesh: new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, alphaMap: alphaTex, transparent: true, fog: false, toneMapped: false, depthWrite: false })) },
+    ];
+    const fitBackdrop = () => { // each layer covers the viewport from the base camera, with margin for the drift
+      const margin = 1.12;
+      layers.forEach((L, i) => {
+        const h = 2 * L.d * Math.tan(THREE.MathUtils.degToRad(st.fov) / 2), w = h * camera.aspect;
+        const k = Math.max(w / st.aspect, h) * margin;
+        L.mesh.scale.set(k * st.aspect, k, 1);
+        L.mesh.position.copy(basePos).addScaledVector(dir, L.d); L.mesh.lookAt(basePos); L.mesh.renderOrder = -10 + i;
+      });
     };
-    fitBackdrop(); addEventListener('resize', fitBackdrop);
+    layers.forEach((L) => scene.add(L.mesh)); fitBackdrop(); addEventListener('resize', fitBackdrop);
+
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60).rotateX(-Math.PI / 2), new THREE.ShadowMaterial({ color: '#2b2416', opacity: st.shadow ?? 0.4 }));
     floor.receiveShadow = true; scene.add(floor);
     scene.add(new THREE.HemisphereLight('#fff6e0', '#d8c79a', st.fill ?? 0.9)); // paintings are high-key: lift the dogs to match
     R.painterly.uniforms.saturation.value = st.saturation ?? 1.0; // the painting already carries the palette
-    sun.position.set(...st.sun); sun.target.position.set(0, 0, 8);
-    Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10, near: 1, far: 80 }); sun.shadow.camera.updateProjectionMatrix();
+    R.painterly.uniforms.bleed.value = st.bleed ?? 0.7;         // soften the seam where 3D dogs meet the painting
+
+    // time of day: ?hour= (default from the level). Noon = high white-gold sun; 17-18 = low, long, orange.
+    const hour = parseFloat(new URLSearchParams(location.search).get('hour')) || st.hour || 12;
+    const elev = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(78 - Math.abs(hour - 12.5) * 11, 8, 78));
+    const warm = THREE.MathUtils.clamp((Math.abs(hour - 12.5) - 2.5) / 3.5, 0, 1); // 0 at midday -> 1 at golden hour
+    const sunColor = new THREE.Color('#fff1d0').lerp(new THREE.Color('#ffb466'), warm);
+    const [sx, , sz] = st.sun; const horiz = Math.hypot(sx, sz) || 1;
+    const sunDir = new THREE.Vector3(sx / horiz * Math.cos(elev), Math.sin(elev), sz / horiz * Math.cos(elev));
+    sun.castShadow = false; sun.intensity = 0.7; sun.color.copy(sunColor); sun.position.copy(sunDir).multiplyScalar(30).add(new THREE.Vector3(0, 0, 8)); sun.target.position.set(0, 0, 8);
+
+    // leaf dapple: a spotlight cookie, slowly turning
+    const dapple = softTexture((g, size) => {
+      g.fillStyle = '#fff'; g.fillRect(0, 0, size, size);
+      for (let i = 0; i < 90; i++) {
+        const x = Math.random() * size, y = Math.random() * size, r = size * (0.03 + Math.random() * 0.07);
+        const grd = g.createRadialGradient(x, y, 0, x, y, r); grd.addColorStop(0, 'rgba(60,45,20,0.55)'); grd.addColorStop(1, 'rgba(60,45,20,0)');
+        g.fillStyle = grd; g.beginPath(); g.arc(x, y, r, 0, 6.28); g.fill();
+      }
+    });
+    dapple.center.set(0.5, 0.5); dapple.wrapS = dapple.wrapT = THREE.RepeatWrapping;
+    const spot = new THREE.SpotLight(sunColor, 2.4 * (1 - warm * 0.25), 0, 0.42, 0.7, 0);
+    spot.position.copy(sunDir).multiplyScalar(26).add(new THREE.Vector3(0, 0, 8)); spot.target.position.set(0, 0, 7);
+    spot.castShadow = true; spot.shadow.mapSize.set(2048, 2048); spot.shadow.bias = -0.0006; spot.shadow.camera.near = 4; spot.shadow.camera.far = 70;
+    spot.map = st.dapple === false ? null : dapple; scene.add(spot, spot.target);
+
+    let fovK = 0;
+    stationTick = (dt, t, run) => {
+      camera.position.set(basePos.x + Math.sin(t * 0.13) * 0.12, basePos.y + Math.sin(t * 0.21) * 0.04, basePos.z + Math.sin(t * 0.09) * 0.06);
+      tmp.copy(baseLook); tmp.x += Math.sin(t * 0.07) * 0.18; camera.lookAt(tmp);
+      fovK = THREE.MathUtils.lerp(fovK, run, 1 - Math.exp(-dt * 1.5));
+      camera.fov = st.fov - 2.5 * fovK; camera.updateProjectionMatrix();
+      dapple.rotation = t * 0.012; dapple.offset.set(Math.sin(t * 0.25) * 0.008, Math.cos(t * 0.19) * 0.006);
+    };
   }
 
   const ctx = { scene, rnd, groundH, waterY, THREE, scatter: (...a) => scatter(scene, ...a), terrain: (o) => terrain(scene, o), forest: makeForest(scene, rnd), makeRiverbedMaterial };
@@ -362,6 +414,7 @@ export function runLevel(cfg) {
       if (r.t > 2) { scene.remove(r.m); r.m.material.dispose(); ripples.splice(i, 1); }
     }
 
+    if (stationTick) stationTick(dt, t, Math.min(1, Math.max(0, Math.abs(speed) - 3.4) / 3.6));
     if (!st) {
       // chase camera, low like the paintings
       const base = Math.max(p.y, waterY ?? -1e9);

@@ -232,7 +232,7 @@ function stepLeash(L, hand, collar, dt) {
 
 // ---------- input ----------
 const keys = {};
-let thirdPerson = false;
+let thirdPerson = false, bob = 0;
 addEventListener('keydown', (e) => {
   keys[e.code] = true;
   if (e.code === 'KeyV') thirdPerson = !thirdPerson;
@@ -286,7 +286,10 @@ function tick() {
     camera.position.lerp(tgt.copy(wp).addScaledVector(tan, -4.2).setY(wp.y + 2.6), 1 - Math.exp(-dt * 4));
     look.copy(wp).addScaledVector(tan, 3).setY(wp.y + 0.6);
   } else {
-    camera.position.copy(wp).addScaledVector(tan, -0.05).setY(wp.y + 1.62);
+    // walking head bob: a little rise on each step and a slight side sway, scaled by speed
+    bob += dt * Math.abs(speed) * 2.4; const bobK = Math.min(1, Math.abs(speed) / 1.5);
+    camera.position.copy(wp).addScaledVector(tan, -0.05).setY(wp.y + 1.62 + Math.abs(Math.sin(bob)) * 0.03 * bobK)
+      .add(tmpT.set(-tan.z, 0, tan.x).multiplyScalar(Math.sin(bob * 0.5) * 0.02 * bobK));
     look.copy(wp).addScaledVector(tan, 7).setY(groundH(wp.x + tan.x * 7, wp.z + tan.z * 7) + 0.25);
   }
   camera.lookAt(look);

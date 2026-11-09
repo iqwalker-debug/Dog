@@ -66,6 +66,12 @@
   breeds (`wool` = curl > 0.5) read as solid wool: near-full strand coverage, fatter strands, half the curl
   scatter, fur-column legs, long wavy ears, teddy head. References: `reference/dog-doodle-side.png` / `-front.png`
   (red goldendoodle, the fur target). Compare with `gaitlab.html?breed=doodle&speed=0.001`.
+- Station light + camera (step 11): the painting is two world-space layers (far 150 m: whole image; near 40 m:
+  ground below `horizon`, faded in over `band`) so the slowly drifting camera gets parallax; FOV pushes in 2.5° when
+  the dog runs; sun = SpotLight with an animated leaf-dapple cookie (`dapple: false` to turn off) + a shadowless warm
+  fill; `?hour=` (or `station.hour`) sets sun height and warmth (12 noon .. 17.5 golden hour). painterly.js gained a
+  `bleed` uniform (wet-into-wet run at hard edges; stations set 0.7, other levels 0) to melt the dogs' outline into the
+  painting. Trail POV (V) has a walking head bob. Keep the far layer inside the sky sphere (radius 320).
 
 ## Brief
 Build a 3D dog-adventure game in Three.js (Vite + TypeScript) whose every frame
