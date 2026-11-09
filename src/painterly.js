@@ -21,12 +21,13 @@ export const PainterlyShader = {
     time: { value: 0 },
     saturation: { value: 1.15 },
     glint: { value: 1.0 },
+    bleed: { value: 0.0 }, // watercolor bleed at hard edges (used by painted stations to blend 3D dogs into the painting)
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
     void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse; uniform vec2 resolution; uniform float time, saturation, glint;
+    uniform sampler2D tDiffuse; uniform vec2 resolution; uniform float time, saturation, glint, bleed;
     varying vec2 vUv;
     ${NOISE}
     const int R = 4; // brush size; 3 = sharper/faster, 5-6 = more painted/slower
@@ -64,6 +65,14 @@ export const PainterlyShader = {
       vec3 gy = texture2D(tDiffuse, vUv+vec2(0.,px.y)).rgb - texture2D(tDiffuse, vUv-vec2(0.,px.y)).rgb;
       float edge = length(gx)+length(gy);
       col *= 1.0 - smoothstep(0.08, 0.6, edge)*0.22;
+
+      // wet-into-wet bleed: at hard edges, let the colors run into each other a few pixels
+      if (bleed > 0.0) {
+        vec3 run = (texture2D(tDiffuse, vUv+px*vec2( 2.5, 0.)).rgb + texture2D(tDiffuse, vUv-px*vec2( 2.5, 0.)).rgb
+                  + texture2D(tDiffuse, vUv+px*vec2(0., 2.5)).rgb + texture2D(tDiffuse, vUv-px*vec2(0., 2.5)).rgb
+                  + texture2D(tDiffuse, vUv+px*vec2( 1.8, 1.8)).rgb + texture2D(tDiffuse, vUv-px*vec2( 1.8, 1.8)).rgb) / 6.0;
+        col = mix(col, run, smoothstep(0.15, 0.55, edge) * bleed);
+      }
 
       // 4-point star glints on very bright pixels (sun on water)
       float g = 0.0;

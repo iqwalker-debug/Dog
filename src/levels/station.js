@@ -8,10 +8,10 @@ const PITCH = 3.3 * Math.PI / 180;
 
 runLevel({
   id: 'station', name: 'Hill Country Creek (painted)', seed: 15,
-  helpExtra: 'painted station: the scene is a painting, the dogs are 3D',
+  helpExtra: 'painted station: the scene is a painting, the dogs are 3D · ?hour=17 for golden hour',
   fog: ['#cfe0e8', 400, 800],
   groundH: () => 0, waterY: null, water: false,
-  station: { image: '/stations/creek.jpg', aspect: 1536 / 1024, fov: 45, pos: [0, 1.6, 0], look: [0, 1.6 - Math.tan(PITCH) * 10, 10], sun: [6, 15, -2], shadow: 0.85, fill: 0.9, saturation: 1.0 },
+  station: { image: '/stations/creek.jpg', aspect: 1536 / 1024, fov: 45, pos: [0, 1.6, 0], look: [0, 1.6 - Math.tan(PITCH) * 10, 10], sun: [6, 15, -2], shadow: 0.85, fill: 0.9, saturation: 1.0, horizon: 0.43, band: 0.1, hour: 12, bleed: 0.7 },
   // walkable: the crushed-granite path, bottom-left into the middle distance; keep off the painted pool (right) and the big oak trunk (far left)
   // (camera looks down +z, so world +x is screen-left. Path is x≈0.4..2 for z 3..12; the pool and slabs are x < 0.3)
   bounds: { x0: 0.35, x1: 3.0, z0: 3.2, z1: 12 },
