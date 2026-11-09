@@ -72,6 +72,12 @@
   fill; `?hour=` (or `station.hour`) sets sun height and warmth (12 noon .. 17.5 golden hour). painterly.js gained a
   `bleed` uniform (wet-into-wet run at hard edges; stations set 0.7, other levels 0) to melt the dogs' outline into the
   painting. Trail POV (V) has a walking head bob. Keep the far layer inside the sky sphere (radius 320).
+- Swimming hole station (step 12): `src/levels/swimstation.js` (`?level=swimstation`, painting 1 as
+  `public/stations/swimhole.jpg`). `station.cropY` shows a portrait painting's upper band (0.34 here keeps the painted
+  husky out of frame); real water (`makeWater`, new `opacity` option, 0.36) sits over the painted pool and ends at the
+  painted wall base (~16 m), so dogs swim, ripple and shake. Camera 1.6 m, tilted up 6°. `floorY` drops the shadow floor
+  under the water. Calibration lesson: read the painting's eye level from where the far waterline meets the wall, then
+  test the water's far edge against it in a screenshot; two guesses were wrong before the third fit.
 
 ## Brief
 Build a 3D dog-adventure game in Three.js (Vite + TypeScript) whose every frame
