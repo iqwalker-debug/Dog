@@ -6,5 +6,6 @@ const levels = {
   bluff: () => import('./levels/bluff.js'),
   creek: () => import('./levels/creek.js'),
   river: () => import('./levels/river.js'),
+  station: () => import('./levels/station.js'),
 };
 (levels[level] || levels.swimhole)();
