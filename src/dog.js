@@ -1,9 +1,10 @@
 // Sculpted dog: one smooth body + head (blended shapes), breed markings in the fur,
-// two-segment legs, breed ears/tails, collar or harness. Gaits: swim, walk/trot/run, shake.
+// two-segment legs, breed ears/tails, collar or harness. Gaits: swim, walk/trot/gallop (planted paws, gait.js), shake.
 import * as THREE from 'three';
 import { makeFur } from './fur.js';
 import { sculpt, sdf, smoothUnion, smoothSubtract } from './sculpt.js';
 import { BREEDS } from './breeds.js';
+import { createGait } from './gait.js';
 
 const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -182,6 +183,9 @@ export function createDog(opts = {}) {
     };
   });
 
+  const planted = createGait({ legs, rig, group, B, S, segLen, pawR });
+  let groundFn = null; // set by levels via dog.setGround(fn); otherwise flat at groundY
+
   // ---- gear ----
   if (B.gear) {
     const gm = new THREE.MeshStandardMaterial({ color: B.gear.color, roughness: 0.6 });
@@ -231,6 +235,8 @@ export function createDog(opts = {}) {
     shake() { if (shakeT <= 0) shakeT = 1.1; },
     /** 'auto' (sits after 4s idle, lies down after 12s), 'stand', 'sit', 'lie' */
     setPose(p) { poseMode = p; },
+    /** height function (x, z) -> y so paws land on rocks and slopes */
+    setGround(fn) { groundFn = fn; },
     get pose() { return pose; },
     sniff(on = true) { sniffing = on; },
     wetten(amount) { wet = Math.min(1, wet + amount); landTime = 0; }, // wading
@@ -248,6 +254,7 @@ export function createDog(opts = {}) {
       let wagSpeed = 2, wagAmp = 0.3, tailLift = 0;
 
       if (inWater) {
+        planted.update(dt, speed, () => groundY, 0, true); // fades IK out while swimming
         wet = Math.min(1, wet + dt * 2);
         landTime = 0;
         group.position.y = THREE.MathUtils.lerp(group.position.y, waterY, 1 - Math.exp(-dt * 6));
@@ -276,6 +283,9 @@ export function createDog(opts = {}) {
         });
         rig.position.y = Math.abs(Math.sin(gait)) * 0.04 * run;
         rig.rotation.x = Math.sin(gait * 2) * 0.03 * run;
+        // planted paws + IK over the sine pose (fades out while sitting/lying; ?gait=old disables)
+        const ground = groundFn || (() => groundY);
+        planted.update(dt, speed, ground, 1 - Math.min(1, (sitB + lieB) * 1.5), sitB + lieB > 0.1 || poseMode === 'sit' || poseMode === 'lie');
         wagSpeed = 8 + run * 6; wagAmp = 0.55; tailLift = 0.15;
         tongue.visible = true;
         mouthOpen = 0.32 + run * 0.12 + Math.sin(t * 9) * 0.05; // panting
@@ -323,7 +333,7 @@ export function createDog(opts = {}) {
         if (wet > 0.05) emitDrops(Math.ceil(dt * 220 * env * wet), 3.5);
         shakeT -= dt;
       } else {
-        rig.rotation.z = inWater ? Math.sin(t * 1.7) * 0.04 : 0;
+        rig.rotation.z = inWater ? Math.sin(t * 1.7) * 0.04 : planted.bank;
         neck.rotation.z = 0; tailRoot.rotation.z = 0;
       }
       // jaw, tongue, blink, happy squint

@@ -48,6 +48,13 @@
   - `src/textures.js`: Poly Haven CC0 textures as triplanar luminance detail (`addDetail(mat, TEX.x)`) so
     the painted vertex colors keep the palette. Chains with existing onBeforeCompile (caustics).
   - N8AO ambient occlusion in painterly.js (warm umber, half-res). `?ao=0` disables it.
+- Grounded gait (step 8): `src/gait.js` — paws plant and stay put; stride advances by distance moved
+  (not time), so no foot sliding. Walk (4-beat) / trot (diagonal) / gallop (rotary) footfall patterns blend
+  by speed; 2-bone IK (hip+knee) per leg; body height/pitch follow fore/hind ground via critically damped
+  springs; banks into turns; paws step around when turning in place. Levels must call
+  `dog.setGround(groundFn)` (world.js, swimhole, trail do) or ground is flat at groundY. Swim and sit/lie fade
+  IK out. `?gait=old` = previous sine gait for comparison; F3 shows gait cost in ms.
+  `gaitlab.html?breed=husky&speed=3.2[&bumpy][&gait=old]` = side-view test page (window.step(n) advances frames).
 
 ## Brief
 Build a 3D dog-adventure game in Three.js (Vite + TypeScript) whose every frame

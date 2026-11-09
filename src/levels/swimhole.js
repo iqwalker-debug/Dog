@@ -201,13 +201,13 @@ treeSpots.forEach(([x, z]) => {
 for (let i = 0; i < 12; i++) { const x = 24 + Math.random() * 20, z = -24 + Math.random() * 48; if (!(x < 44 && z > -8 && z < 18)) placeTree(scene, new THREE.Vector3(x, groundHeight(x, z), z), { height: 1 + Math.random(), bush: true }); }
 
 // ---------- Dog ----------
-let dog = createDog('golden');
+let dog = createDog('golden'); dog.setGround(groundHeight);
 dog.group.position.set(-6, 0, 14);
 scene.add(dog.group, dog.drops);
 
 // number keys 1-0 swap the player's breed
 function swapBreed(key) {
-  const old = dog; dog = createDog(key);
+  const old = dog; dog = createDog(key); dog.setGround(groundHeight);
   dog.group.position.copy(old.group.position);
   scene.remove(old.group); old.dispose(); scene.add(dog.group, dog.drops);
   document.getElementById('help').textContent = `${dog.name} · WASD / drag · Shift run · Space splash · E shake · 1-0 breeds`;
@@ -254,7 +254,7 @@ const FACE = new URLSearchParams(location.search).has('face');     // add &face 
 const lineup = [];
 if (SHOWROOM) {
   (BREED_ORDER.includes(SOLO) ? [SOLO] : BREED_ORDER).forEach((k, i) => {
-    const d = createDog(k);
+    const d = createDog(k); d.setGround(groundHeight);
     const x = 30 + (i % 5) * 2.2, z = 6 + Math.floor(i / 5) * 3;
     d.group.position.set(x, groundHeight(x, z) + 0.6, z); d.group.rotation.y = -Math.PI / 2 + 0.5;
     const pz = new URLSearchParams(location.search).get('pose'); if (pz) d.setPose(pz); // &pose=sit|lie
