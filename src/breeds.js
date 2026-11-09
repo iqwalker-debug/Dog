@@ -14,7 +14,7 @@ export const BREEDS = {
   },
   redGolden: {
     name: 'Red Golden', size: 1.02, legH: 0.68, width: 1.0, snout: 0.18, ears: 'flop', tail: 'feather',
-    coat: '#b5541d', second: '#d27a3b', furLen: 0.08, curl: 0.2, shells: 20,
+    coat: '#c4652a', second: '#e39a52', furLen: 0.08, curl: 0.2, shells: 20,
     mark: (p, part) => (part === 'body' ? under(p, -0.1) * 0.7 : 0.2),
     gear: { type: 'harness', color: '#26272b' },
   },
@@ -26,7 +26,7 @@ export const BREEDS = {
   },
   doodle: {
     name: 'Red Goldendoodle', size: 0.95, legH: 0.66, width: 1.0, snout: 0.14, ears: 'flop', tail: 'pom',
-    coat: '#b0612b', second: '#c87a3f', furLen: 0.11, curl: 0.9, shells: 22,
+    coat: '#bf7238', second: '#dd9a5a', furLen: 0.11, curl: 0.9, shells: 22,
     mark: () => 0.2,
     gear: { type: 'harness', color: '#2f63c9' },
   },
@@ -37,7 +37,7 @@ export const BREEDS = {
   },
   husky: {
     name: 'Husky', size: 1.0, legH: 0.66, width: 1.0, snout: 0.17, ears: 'erect', tail: 'plume',
-    coat: '#24252b', second: '#f3f0ea', furLen: 0.08, curl: 0.05, shells: 20,
+    coat: '#2b2c33', second: '#f5f2ec', furLen: 0.08, curl: 0.05, shells: 20,
     mark: (p, part) => {
       if (part === 'body') return Math.max(under(p, -0.02, 0.06), THREE.MathUtils.smoothstep(p.z, 0.3, 0.5) * under(p, 0.12));
       if (part === 'head') {
@@ -52,12 +52,12 @@ export const BREEDS = {
   },
   lab: {
     name: 'Black Lab', size: 1.0, legH: 0.66, width: 0.95, snout: 0.18, ears: 'flop', tail: 'otter',
-    coat: '#17171a', second: '#2a2a2e', furLen: 0.025, curl: 0, shells: 10,
+    coat: '#1f1c1c', second: '#3a3433', furLen: 0.025, curl: 0, shells: 10,
     mark: () => 0, gear: { type: 'harness', color: '#7b3fb0' },
   },
   bernedoodle: {
     name: 'Bernedoodle', size: 1.0, legH: 0.68, width: 1.0, snout: 0.15, ears: 'flop', tail: 'pom',
-    coat: '#18181b', second: '#f1ede4', furLen: 0.11, curl: 0.85, shells: 22,
+    coat: '#221f20', second: '#f3eee4', furLen: 0.11, curl: 0.85, shells: 22,
     mark: (p, part) => {
       if (part === 'body') return THREE.MathUtils.smoothstep(p.z, 0.32, 0.5) * under(p, 0.1);
       if (part === 'head') return p.z > 0.12 || (Math.abs(p.x) < 0.03 && p.y > 0.0) ? 1 : 0;
@@ -74,7 +74,7 @@ export const BREEDS = {
   },
   collie: {
     name: 'Border Collie Mix', size: 0.9, legH: 0.64, width: 0.9, snout: 0.17, ears: 'flop', tail: 'feather',
-    coat: '#161618', second: '#f3f0ea', furLen: 0.07, curl: 0.1, shells: 18,
+    coat: '#1f1d1e', second: '#f3f0ea', furLen: 0.07, curl: 0.1, shells: 18,
     mark: (p, part) => {
       if (part === 'body') return THREE.MathUtils.smoothstep(p.z, 0.35, 0.5) * under(p, 0.2);
       if (part === 'head') return Math.abs(p.x) < 0.035 || p.z > 0.14 ? 1 : 0;

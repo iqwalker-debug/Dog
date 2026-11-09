@@ -60,8 +60,12 @@
   the painter stood, painting on a camera-attached backdrop plane, ShadowMaterial floor for the dogs' shadows,
   warm fill light, saturation 1.0), and only the dogs are 3D. `?level=station` = hill-country creek (painting 15,
   `public/stations/creek.jpg`); walkable bounds/blocked map the painted path (camera looks +z, so world +x is
-  screen-left). Next stations: swimming hole (painting 1), Violet Crown arch (8). Biggest remaining gap: the dogs
-  themselves (shell fur + Kuwahara reads blocky next to the painted fur).
+  screen-left). Next stations: swimming hole (painting 1), Violet Crown arch (8).
+- Painted fur (step 10): fur.js strands taper to points, dark roots -> warm tips, warm fresnel rim (`rim` option);
+  density 58 (40 curly) so the paint pass softens instead of blocking; coats warmed to the paintings. Curly
+  breeds (`wool` = curl > 0.5) read as solid wool: near-full strand coverage, fatter strands, half the curl
+  scatter, fur-column legs, long wavy ears, teddy head. References: `reference/dog-doodle-side.png` / `-front.png`
+  (red goldendoodle, the fur target). Compare with `gaitlab.html?breed=doodle&speed=0.001`.
 
 ## Brief
 Build a 3D dog-adventure game in Three.js (Vite + TypeScript) whose every frame

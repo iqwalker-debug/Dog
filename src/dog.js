@@ -30,11 +30,12 @@ export function createDog(opts = {}) {
   const eyeMat = new THREE.MeshStandardMaterial({ color: '#3b2210', roughness: 0.05 });
   const tongueMat = new THREE.MeshStandardMaterial({ color: '#e46f7c', roughness: 0.3 });
   const fl = B.furLen;
+  const wool = B.curl > 0.5; // doodles: fur columns for legs, long wavy ears, teddy head (reference/dog-doodle-*.png)
 
   function furred(geo, parent, furScale = 1, extra = {}) {
     const holder = new THREE.Group();
     const skin = new THREE.Mesh(geo, skinMat); skin.castShadow = true; holder.add(skin);
-    const f = makeFur(geo, { length: fl * furScale, curl: B.curl, shells: B.shells, density: B.curl > 0.5 ? 30 : 42, ...extra });
+    const f = makeFur(geo, { length: fl * furScale, curl: B.curl, shells: B.shells, density: B.curl > 0.5 ? 40 : 58, ...extra }); // finer strands: the paint pass softens them instead of blocking them
     holder.add(f); furs.push(f); parent.add(holder);
     return holder;
   }
@@ -91,7 +92,7 @@ export function createDog(opts = {}) {
     for (let i = 0; i < P.count; i++) a[i] = fn(v.fromBufferAttribute(P, i));
     geo.setAttribute('aLen', new THREE.BufferAttribute(a, 1)); return geo;
   };
-  const headFur = 0.75;
+  const headFur = wool ? 1.15 : 0.75;
   furred(withLen(sculpt(headSdf, v3(0, 0, 0.08), 0.34, 40, (p) => tint('head', p)), faceLen), head, headFur);
 
   // nose: wide leather pad with nostrils
@@ -134,7 +135,9 @@ export function createDog(opts = {}) {
     let geo;
     if (B.ears === 'flop') {
       pivot.position.set(s * 0.15 * W, 0.09, -0.01);
-      geo = new THREE.SphereGeometry(1, 14, 10).scale(0.03, 0.105, 0.07).rotateZ(s * 0.18).translate(s * 0.04, -0.07, 0);
+      geo = wool
+        ? new THREE.SphereGeometry(1, 14, 10).scale(0.032, 0.135, 0.085).rotateZ(s * 0.22).translate(s * 0.045, -0.1, 0)
+        : new THREE.SphereGeometry(1, 14, 10).scale(0.03, 0.105, 0.07).rotateZ(s * 0.18).translate(s * 0.04, -0.07, 0);
     } else if (B.ears === 'erect') {
       pivot.position.set(s * 0.075, 0.15, -0.04);
       geo = new THREE.ConeGeometry(0.055, 0.13, 8).scale(1, 1, 0.45).rotateZ(-s * 0.25).translate(s * 0.015, 0.06, 0);
@@ -142,7 +145,7 @@ export function createDog(opts = {}) {
       pivot.position.set(s * 0.1, 0.14, -0.03);
       geo = new THREE.ConeGeometry(0.07, 0.15, 10).scale(1, 1, 0.4).rotateZ(-s * 0.35).translate(s * 0.03, 0.06, 0);
     }
-    furred(colorize(geo, (p) => tint('ear', p)), pivot, B.ears === 'flop' ? 1.1 : 0.4);
+    furred(colorize(geo, (p) => tint('ear', p)), pivot, B.ears === 'flop' ? (wool ? 1.5 : 1.1) : 0.4);
     return { pivot, s, ang: 0, vel: 0 };
   });
 
@@ -173,10 +176,10 @@ export function createDog(opts = {}) {
   const legs = [[-1, 0.3, true], [1, 0.3, true], [-1, -0.42, false], [1, -0.42, false]].map(([s, z, front], i) => {
     const hip = new THREE.Group(); hip.position.set(s * 0.13 * W, -top, z); rig.add(hip);
     const knee = new THREE.Group(); knee.position.y = -segLen; hip.add(knee);
-    const rU = front ? 0.07 : 0.085, rL = 0.05;
-    furred(colorize(new THREE.CapsuleGeometry(rU, segLen, 4, 10).translate(0, -segLen / 2, 0), (p) => tint('leg', p)), hip, 0.7);
-    furred(colorize(new THREE.CapsuleGeometry(rL, segLen, 4, 10).translate(0, -segLen / 2, 0), (p) => tint('paw', p)), knee, 0.5);
-    furred(colorize(new THREE.SphereGeometry(1, 12, 8).scale(0.055, pawR, 0.075).translate(0, -segLen, 0.025), (p) => tint('paw', p)), knee, 0.4);
+    const rU = (front ? 0.07 : 0.085) * (wool ? 1.15 : 1), rL = wool ? 0.062 : 0.05;
+    furred(colorize(new THREE.CapsuleGeometry(rU, segLen, 4, 10).translate(0, -segLen / 2, 0), (p) => tint('leg', p)), hip, wool ? 1.1 : 0.7);
+    furred(colorize(new THREE.CapsuleGeometry(rL, segLen, 4, 10).translate(0, -segLen / 2, 0), (p) => tint('paw', p)), knee, wool ? 0.95 : 0.5);
+    furred(colorize(new THREE.SphereGeometry(1, 12, 8).scale(0.055, pawR, 0.075).translate(0, -segLen, 0.025), (p) => tint('paw', p)), knee, wool ? 0.7 : 0.4);
     return {
       hip, knee, front, restU: front ? -0.04 : 0.32, restK: front ? 0.06 : -0.62,
       phase: [0, Math.PI, Math.PI * 0.5, Math.PI * 1.5][i],

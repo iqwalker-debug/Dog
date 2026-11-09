@@ -4,6 +4,7 @@ import * as THREE from 'three';
 
 export function makeFur(geometry, {
   color = '#222', length = 0.08, density = 38, shells = 24, curl = 0, droop = 0.25,
+  rim = 0.45, // warm backlight on the fur tips, like the sun catching coat edges in the paintings
 } = {}) {
   const base = geometry.index ? geometry.toNonIndexed() : geometry.clone();
   base.computeVertexNormals();
@@ -27,7 +28,7 @@ export function makeFur(geometry, {
 
   const uniforms = {
     uLen: { value: length }, uDensity: { value: density }, uWet: { value: 0 },
-    uCurl: { value: curl }, uDroop: { value: droop },
+    uCurl: { value: curl }, uDroop: { value: droop }, uRim: { value: rim },
   };
   const mat = new THREE.MeshStandardMaterial({ color: col ? '#ffffff' : color, roughness: 0.85, vertexColors: !!col });
   mat.onBeforeCompile = (sh) => {
@@ -44,13 +45,13 @@ export function makeFur(geometry, {
         vec3 g = normalize(transpose(mat3(modelMatrix)) * vec3(0.0, -1.0, 0.0));
         transformed += normal * aShell * L;
         transformed += g * aShell * aShell * L * (uDroop + uWet * 0.9);
-        transformed += uCurl * L * aShell * vec3(
+        transformed += uCurl * L * aShell * 0.45 * vec3(
           sin(aShell * 9.0 + position.y * 30.0),
           cos(aShell * 9.0 + position.x * 30.0),
           sin(aShell * 7.0 + position.z * 30.0));`);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform float uDensity, uWet;
+        uniform float uDensity, uWet, uRim, uCurl;
         varying float vShell; varying vec3 vBase; varying vec3 vN;
         float h3(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
@@ -58,10 +59,19 @@ export function makeFur(geometry, {
         vec3 cell = floor(q); vec3 l = fract(q) - 0.5;
         vec3 nn = normalize(vN); vec3 lp = l - dot(l, nn) * nn;
         float r = h3(cell);
-        float strand = 0.5 + 0.5 * r;
+        // curly coats are wool: nearly every cell grows a strand and strands stay fat, so the coat reads solid
+        float strand = min(1.0, 0.5 + 0.5 * r + uCurl * 0.35);
         if (vShell > strand) discard;
-        if (length(lp) > (1.0 - vShell / strand) * 0.6) discard;
-        diffuseColor.rgb *= mix(0.6, 1.1, vShell) * (1.0 - uWet * 0.35) * (0.85 + 0.3 * r);`);
+        float tip = vShell / strand;                       // 0 at the root, 1 at this strand's tip
+        if (length(lp) > (1.0 - tip * tip) * (0.55 + 0.3 * uCurl)) discard; // strands taper to a point instead of a stub
+        // painted fur: dark roots, warm tips, slight strand-to-strand variation
+        vec3 tipTint = vec3(1.08, 1.0, 0.9);
+        diffuseColor.rgb *= mix(0.55, 1.0, vShell) * (1.0 - uWet * 0.35) * (0.88 + 0.24 * r);
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * tipTint, vShell);
+        // warm rim where the sun comes through the coat edge
+        vec3 V = normalize(vViewPosition); vec3 Nn = normalize(vNormal);
+        float fres = pow(1.0 - abs(dot(V, Nn)), 3.0);
+        diffuseColor.rgb += vec3(1.0, 0.86, 0.6) * fres * vShell * uRim * (1.0 - uWet * 0.5);`);
   };
 
   const mesh = new THREE.Mesh(geo, mat);
