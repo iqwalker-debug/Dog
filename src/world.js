@@ -9,7 +9,7 @@ import { placeTree, updateTrees } from './trees.js';
 import { addDetail, TEX } from './textures.js';
 export { addDetail, TEX, placeTree };
 
-export const LEVEL_ORDER = ['swimhole', 'trail', 'bluff', 'creek', 'river'];
+export const LEVEL_ORDER = ['swimhole', 'trail', 'bluff', 'creek', 'river', 'station'];
 export const nextLevel = (cur) => LEVEL_ORDER[(LEVEL_ORDER.indexOf(cur) + 1) % LEVEL_ORDER.length];
 export { THREE, makeRiverbedMaterial };
 
@@ -159,6 +159,27 @@ export function runLevel(cfg) {
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, fog: false, depthWrite: false }));
     const a = rnd() * 6.28; sp.position.set(Math.cos(a) * 220, 45 + rnd() * 60, Math.sin(a) * 220);
     sp.scale.set(80 + rnd() * 60, 38, 1); scene.add(sp);
+  }
+
+  // ---- painted station (step 9): fixed camera, a painting as the backdrop, a shadow-only floor ----
+  const st = cfg.station;
+  if (st) {
+    camera.fov = st.fov; camera.near = 0.1; camera.far = 500; camera.updateProjectionMatrix();
+    camera.position.set(...st.pos); camera.lookAt(...st.look);
+    const tex = new THREE.TextureLoader().load(st.image); tex.colorSpace = THREE.SRGBColorSpace;
+    const backdrop = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, fog: false, toneMapped: false }));
+    backdrop.position.z = -300; camera.add(backdrop); scene.add(camera);
+    const fitBackdrop = () => { // cover the viewport, keep the painting's aspect
+      const h = 2 * 300 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2), w = h * camera.aspect;
+      const k = Math.max(w / st.aspect, h); backdrop.scale.set(k * st.aspect, k, 1);
+    };
+    fitBackdrop(); addEventListener('resize', fitBackdrop);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60).rotateX(-Math.PI / 2), new THREE.ShadowMaterial({ color: '#2b2416', opacity: st.shadow ?? 0.4 }));
+    floor.receiveShadow = true; scene.add(floor);
+    scene.add(new THREE.HemisphereLight('#fff6e0', '#d8c79a', st.fill ?? 0.9)); // paintings are high-key: lift the dogs to match
+    R.painterly.uniforms.saturation.value = st.saturation ?? 1.0; // the painting already carries the palette
+    sun.position.set(...st.sun); sun.target.position.set(0, 0, 8);
+    Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10, near: 1, far: 80 }); sun.shadow.camera.updateProjectionMatrix();
   }
 
   const ctx = { scene, rnd, groundH, waterY, THREE, scatter: (...a) => scatter(scene, ...a), terrain: (o) => terrain(scene, o), forest: makeForest(scene, rnd), makeRiverbedMaterial };
@@ -341,16 +362,17 @@ export function runLevel(cfg) {
       if (r.t > 2) { scene.remove(r.m); r.m.material.dispose(); ripples.splice(i, 1); }
     }
 
-    // chase camera, low like the paintings
-    const base = Math.max(p.y, waterY ?? -1e9);
-    camPos.set(p.x - Math.sin(heading) * 4.6, base + 1.5, p.z - Math.cos(heading) * 4.6);
-    if (groundH(camPos.x, camPos.z) + 0.6 > camPos.y) camPos.y = groundH(camPos.x, camPos.z) + 0.6;
-    camLook.set(p.x + Math.sin(heading) * 8, base + 0.3, p.z + Math.cos(heading) * 8);
-    camera.position.lerp(camPos, 1 - Math.exp(-dt * 4));
-    camera.lookAt(camLook);
+    if (!st) {
+      // chase camera, low like the paintings
+      const base = Math.max(p.y, waterY ?? -1e9);
+      camPos.set(p.x - Math.sin(heading) * 4.6, base + 1.5, p.z - Math.cos(heading) * 4.6);
+      if (groundH(camPos.x, camPos.z) + 0.6 > camPos.y) camPos.y = groundH(camPos.x, camPos.z) + 0.6;
+      camLook.set(p.x + Math.sin(heading) * 8, base + 0.3, p.z + Math.cos(heading) * 8);
+      camera.position.lerp(camPos, 1 - Math.exp(-dt * 4));
+      camera.lookAt(camLook);
+      sun.position.copy(p).add(tmp.set(-16, 34, 12)); sun.target.position.copy(p);
+    }
     for (const d of [dog, ...buddies.map((b) => b.dog)]) { const dist = d.group.position.distanceTo(camera.position); d.setFurDetail(dist < 10 ? 24 : dist < 25 ? 12 : 6); }
-
-    sun.position.copy(p).add(tmp.set(-16, 34, 12)); sun.target.position.copy(p);
     R.render(dt);
 
     toastT -= dt;

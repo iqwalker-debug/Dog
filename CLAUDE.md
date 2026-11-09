@@ -55,6 +55,13 @@
   `dog.setGround(groundFn)` (world.js, swimhole, trail do) or ground is flat at groundY. Swim and sit/lie fade
   IK out. `?gait=old` = previous sine gait for comparison; F3 shows gait cost in ms.
   `gaitlab.html?breed=husky&speed=3.2[&bumpy][&gait=old]` = side-view test page (window.step(n) advances frames).
+- Painted station (step 9): `src/levels/station.js` + `cfg.station` in world.js. The route to the reference
+  quality on weak GPUs (Ian's MacBook Neo, A18 Pro, 8 GB): the scene IS one of the paintings (fixed camera where
+  the painter stood, painting on a camera-attached backdrop plane, ShadowMaterial floor for the dogs' shadows,
+  warm fill light, saturation 1.0), and only the dogs are 3D. `?level=station` = hill-country creek (painting 15,
+  `public/stations/creek.jpg`); walkable bounds/blocked map the painted path (camera looks +z, so world +x is
+  screen-left). Next stations: swimming hole (painting 1), Violet Crown arch (8). Biggest remaining gap: the dogs
+  themselves (shell fur + Kuwahara reads blocky next to the painted fur).
 
 ## Brief
 Build a 3D dog-adventure game in Three.js (Vite + TypeScript) whose every frame
